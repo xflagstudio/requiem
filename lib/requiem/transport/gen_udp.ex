@@ -66,6 +66,7 @@ defmodule Requiem.Transport.GenUDP do
 
   def handle_cast({:batch_send, batch}, state) do
     Logger.debug("udp:back_send")
+
     batch
     |> Enum.each(fn {address, packet} ->
       send_packet(state.sock, address, packet)
@@ -89,18 +90,21 @@ defmodule Requiem.Transport.GenUDP do
 
     {:noreply, state}
   end
+
   def handle_info(request, state) do
     if state.loggable do
-      Logger.debug("<Requiem.Transport.UDP> unsupported handle_info: #{inspect request}")
+      Logger.debug("<Requiem.Transport.UDP> unsupported handle_info: #{inspect(request)}")
     end
+
     {:noreply, state}
   end
 
   @impl GenServer
   def terminate(reason, state) do
     if state.loggable do
-      Logger.debug("<Requiem.Transport.UDP> terminated: #{inspect reason}")
+      Logger.debug("<Requiem.Transport.UDP> terminated: #{inspect(reason)}")
     end
+
     :gen_udp.close(state.sock)
     :ok
   end
@@ -117,8 +121,8 @@ defmodule Requiem.Transport.GenUDP do
 
   defp send_packet(sock, address, packet) do
     # TODO better performance
-    #header = Requiem.Address.to_udp_header(address)
-    #Port.command(sock, [header, packet])
+    # header = Requiem.Address.to_udp_header(address)
+    # Port.command(sock, [header, packet])
     :gen_udp.send(sock, address.host, address.port, packet)
   end
 

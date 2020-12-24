@@ -25,6 +25,7 @@ defmodule Requiem.ConnectionSupervisor do
   @spec dispatch_packet(module, Address.t(), binary, binary, binary, boolean) :: :ok
   def dispatch_packet(handler, address, packet, _scid, dcid, loggable) do
     Logger.debug("loopup from registry: DCID:#{Base.encode16(dcid)}")
+
     case ConnectionRegistry.lookup(handler, dcid) do
       {:ok, pid} ->
         Logger.debug("found, process, packet")
@@ -46,6 +47,7 @@ defmodule Requiem.ConnectionSupervisor do
           :ok | {:error, :system_error}
   def create_connection(handler, transport, address, scid, dcid, odcid, loggable) do
     Logger.debug("create cnonection: DCID:#{Base.encode16(dcid)}")
+
     case ConnectionRegistry.lookup(handler, dcid) do
       {:error, :not_found} ->
         opts = [

@@ -120,7 +120,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   end
 
   defp handle_token_missing_packet(address, scid, dcid, version, state) do
-    with {:ok, new_id} <- Requiem.QUIC.ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
+    with {:ok, new_id} <-
+           Requiem.QUIC.ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
          {:ok, token} <-
            Requiem.QUIC.RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
@@ -139,6 +140,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         Logger.debug("validate success: ODCID: #{Base.encode16(odcid)}")
         Logger.debug("validate success: DCID: #{Base.encode16(dcid)}")
         Logger.debug("validate success: SCID: #{Base.encode16(scid)}")
+
         case Requiem.ConnectionSupervisor.create_connection(
                state.handler,
                state.transport,
@@ -156,8 +158,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         end
 
       :error ->
-            Logger.debug("validate failed: DCID: #{Base.encode16(dcid)}")
-            Logger.debug("validate failed: SCID: #{Base.encode16(scid)}")
+        Logger.debug("validate failed: DCID: #{Base.encode16(dcid)}")
+        Logger.debug("validate failed: SCID: #{Base.encode16(scid)}")
         :error
     end
   end

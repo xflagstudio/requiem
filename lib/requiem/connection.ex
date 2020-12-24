@@ -74,9 +74,9 @@ defmodule Requiem.Connection do
     Process.flag(:trap_exit, true)
 
     case Requiem.ConnectionRegistry.register(
-      state.handler,
-      state.conn_state.dcid
-    ) do
+           state.handler,
+           state.conn_state.dcid
+         ) do
       {:ok, _pid} ->
         Logger.debug("Connection:init:registered")
         send(self(), :__accept__)
@@ -214,19 +214,21 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def handle_info(:__accept__, state) do
-        Logger.debug("Connection:accept")
+    Logger.debug("Connection:accept")
+
     case Requiem.QUIC.Connection.accept(
-      state.handler,
-      state.conn_state.scid,
-      state.conn_state.odcid
-    ) do
+           state.handler,
+           state.conn_state.scid,
+           state.conn_state.odcid
+         ) do
       {:ok, conn} ->
         Logger.debug("Connection:accept:complete")
+
         if state.web_transport do
           # just set conn, don't call handler_init here
           {:noreply, %{state | conn: conn}}
         else
-        Logger.debug("Connection:accept:handle_init")
+          Logger.debug("Connection:accept:handle_init")
           handler_init(conn, nil, state)
         end
 
@@ -240,7 +242,8 @@ defmodule Requiem.Connection do
   end
 
   def handle_info(:__timeout__, state) do
-        Logger.debug("Connection:on_timeout")
+    Logger.debug("Connection:on_timeout")
+
     case Requiem.QUIC.Connection.on_timeout(state.conn) do
       {:ok, next_timeout} ->
         Logger.debug("Connection:reset")
@@ -263,7 +266,8 @@ defmodule Requiem.Connection do
         {:__stream_recv__, 2, data},
         %{web_transport: true, handler_initialized: false} = state
       ) do
-        Logger.debug("Connection:stream_recv")
+    Logger.debug("Connection:stream_recv")
+
     case Requiem.ClientIndication.from_binary(data) do
       {:ok, client} ->
         handler_init(state.conn, client, state)
@@ -280,7 +284,7 @@ defmodule Requiem.Connection do
         %{web_transport: true, handler_initialized: true} = state
       ) do
     # just ignore
-        Logger.debug("Connection:stream_recv:2")
+    Logger.debug("Connection:stream_recv:2")
     {:noreply, state}
   end
 
@@ -390,8 +394,10 @@ defmodule Requiem.Connection do
       {:error, :system_error} ->
         send(self(), {:__delayed_close__, {:shutdown, :system_error}})
     end
+
     {:noreply, state}
   end
+
   def handle_info({:__delayed_close__, reason}, state) do
     {:stop, reason, state}
   end
@@ -430,11 +436,13 @@ defmodule Requiem.Connection do
 
   def handle_info({:__drain__, data}, state) do
     Logger.debug("Connection:drain")
+
     state.transport.send(
       state.handler,
       state.conn_state.address,
       data
     )
+
     {:noreply, state}
   end
 
