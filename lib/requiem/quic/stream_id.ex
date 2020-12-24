@@ -2,32 +2,32 @@ defmodule Requiem.QUIC.StreamId do
   @type orientation :: :bidi | :uni
   @type initiator :: :server | :client
 
-  @spec is_bidi(non_neg_integer) :: boolean
-  def is_bidi(stream_id) do
+  @spec is_bidi?(non_neg_integer) :: boolean
+  def is_bidi?(stream_id) do
     case classify(stream_id) do
       {:ok, _, :bidi} -> true
       _ -> false
     end
   end
 
-  @spec is_uni(non_neg_integer) :: boolean
-  def is_uni(stream_id) do
+  @spec is_uni?(non_neg_integer) :: boolean
+  def is_uni?(stream_id) do
     case classify(stream_id) do
       {:ok, _, :uni} -> true
       _ -> false
     end
   end
 
-  @spec is_client_initiated(non_neg_integer) :: boolean
-  def is_client_initiated(stream_id) do
+  @spec is_client_initiated?(non_neg_integer) :: boolean
+  def is_client_initiated?(stream_id) do
     case classify(stream_id) do
       {:ok, :client, _} -> true
       _ -> false
     end
   end
 
-  @spec is_server_initiated(non_neg_integer) :: boolean
-  def is_server_initiated(stream_id) do
+  @spec is_server_initiated?(non_neg_integer) :: boolean
+  def is_server_initiated?(stream_id) do
     case classify(stream_id) do
       {:ok, :server, _} -> true
       _ -> false

@@ -14,19 +14,19 @@ defmodule RequiemTest.ConnectionStateTest do
     state = ConnectionState.new(addr, dcid, scid, odcid)
 
     {id1, state1} = ConnectionState.create_new_stream_id(state, :bidi)
-    assert StreamId.is_server_initiated(id1)
-    assert StreamId.is_bidi(id1)
-    assert !StreamId.is_uni(id1)
+    assert StreamId.is_server_initiated?(id1)
+    assert StreamId.is_bidi?(id1)
+    assert !StreamId.is_uni?(id1)
 
     {id2, state2} = ConnectionState.create_new_stream_id(state1, :bidi)
-    assert StreamId.is_server_initiated(id2)
-    assert StreamId.is_bidi(id2)
-    assert !StreamId.is_uni(id2)
+    assert StreamId.is_server_initiated?(id2)
+    assert StreamId.is_bidi?(id2)
+    assert !StreamId.is_uni?(id2)
 
     {id3, state3} = ConnectionState.create_new_stream_id(state2, :uni)
-    assert StreamId.is_server_initiated(id3)
-    assert !StreamId.is_bidi(id3)
-    assert StreamId.is_uni(id3)
+    assert StreamId.is_server_initiated?(id3)
+    assert !StreamId.is_bidi?(id3)
+    assert StreamId.is_uni?(id3)
 
     assert state3.stream_id_pod == 3
   end
