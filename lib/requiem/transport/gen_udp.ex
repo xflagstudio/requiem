@@ -43,6 +43,7 @@ defmodule Requiem.Transport.GenUDP do
           Logger.debug("<Requiem.Transport.UDP> opened UDP port #{inspect(state.port)}")
         end
 
+        Process.flag(:trap_exit, true)
         {:ok, %{state | sock: sock}}
 
       {:error, reason} ->
@@ -96,7 +97,13 @@ defmodule Requiem.Transport.GenUDP do
   end
 
   @impl GenServer
-  def terminate(_reason, _state), do: :ok
+  def terminate(reason, state) do
+    if state.loggable do
+      Logger.debug("<Requiem.Transport.UDP> terminated: #{inspect reason}")
+    end
+    :gen_udp.close(state.sock)
+    :ok
+  end
 
   defp new(opts) do
     %__MODULE__{
@@ -109,9 +116,9 @@ defmodule Requiem.Transport.GenUDP do
   end
 
   defp send_packet(sock, address, packet) do
+    Logger.debug("address:#{inspect address}")
     header = Requiem.Address.to_udp_header(address)
-    #Port.command(sock, [header, packet])
-    :erlang.port_command(sock, [header, packet])
+    Port.command(sock, [header, packet])
   end
 
   defp name(handler),
