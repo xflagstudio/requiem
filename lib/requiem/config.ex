@@ -161,7 +161,7 @@ defmodule Requiem.Config do
     end
 
     if is_web_transport do
-      Requiem.QUIC.Config.set_application_protos(handler, @web_transport_alpn)
+      Requiem.QUIC.Config.set_application_protos(handler, [@web_transport_alpn])
     else
       application_protos = get(handler, :quic_application_protos)
 

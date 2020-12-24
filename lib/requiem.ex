@@ -67,7 +67,6 @@ defmodule Requiem do
     quote location: :keep, bind_quoted: [opts: opts] do
       @behaviour Requiem
 
-      use Requiem.StreamId
       import Requiem.ConnectionState, only: [trap_exit: 2]
 
       @spec close() :: no_return
@@ -78,7 +77,7 @@ defmodule Requiem do
 
       @spec stream_send(non_neg_integer, binary) :: no_return
       def stream_send(stream_id, data) do
-        if StreamId.is_bidi?(streamId) || StreamId.is_server_initiated?(stream_id) do
+        if Requiem.StreamId.is_bidi?(stream_id) || Requiem.StreamId.is_server_initiated?(stream_id) do
           send(self(), {:__stream_send__, stream_id, data})
         else
           raise "You can't send data on this stream."
