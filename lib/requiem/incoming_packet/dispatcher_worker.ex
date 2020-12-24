@@ -43,19 +43,23 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   def handle_call({:packet, address, packet}, _from, state) do
     case Requiem.QUIC.Packet.parse_header(packet) do
       {:ok, scid, dcid, _token, _version, false, _version_supported} ->
-        Logger.debug("regular")
+        Logger.debug("regular: DCID #{Base.encode16(dcid)}")
+        Logger.debug("regular: SCID #{Base.encode16(scid)}")
         handle_regular_packet(address, packet, scid, dcid, state)
 
       {:ok, scid, dcid, _token, _version, true, false} ->
-        Logger.debug("unsupported version")
+        Logger.debug("unsupported ver: DCID #{Base.encode16(dcid)}")
+        Logger.debug("unsupported ver: SCID #{Base.encode16(scid)}")
         handle_version_unsupported_packet(address, scid, dcid, state)
 
       {:ok, scid, dcid, <<>>, version, true, true} ->
-        Logger.debug("token missing")
+        Logger.debug("token missing: DCID #{Base.encode16(dcid)}")
+        Logger.debug("token missing: SCID #{Base.encode16(scid)}")
         handle_token_missing_packet(address, scid, dcid, version, state)
 
       {:ok, scid, dcid, token, _version, true, true} ->
-        Logger.debug("init packet")
+        Logger.debug("init: DCID #{Base.encode16(dcid)}")
+        Logger.debug("init: SCID #{Base.encode16(scid)}")
         handle_init_packet(address, packet, scid, dcid, token, state)
 
       {:error, reason} ->
@@ -132,6 +136,9 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   defp handle_init_packet(address, packet, scid, dcid, token, state) do
     case Requiem.QUIC.RetryToken.validate(address, state.token_secret, token) do
       {:ok, odcid, _retry_scid} ->
+        Logger.debug("validate success: ODCID: #{Base.encode16(odcid)}")
+        Logger.debug("validate success: DCID: #{Base.encode16(dcid)}")
+        Logger.debug("validate success: SCID: #{Base.encode16(scid)}")
         case Requiem.ConnectionSupervisor.create_connection(
                state.handler,
                state.transport,
@@ -149,6 +156,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         end
 
       :error ->
+            Logger.debug("validate failed: DCID: #{Base.encode16(dcid)}")
+            Logger.debug("validate failed: SCID: #{Base.encode16(scid)}")
         :error
     end
   end

@@ -1,6 +1,6 @@
 defmodule Requiem.Connection do
   require Logger
-  use GenServer
+  use GenServer, restart: :temporary
 
   defmodule ExceptionGuard do
     def guard(error_resp, func) do
@@ -56,16 +56,19 @@ defmodule Requiem.Connection do
 
   @spec process_packet(pid, RequiemAddress.t(), binary) :: :ok
   def process_packet(pid, address, packet) do
+    Logger.debug("Connection:process_packet")
     GenServer.cast(pid, {:__packet__, address, packet})
   end
 
   @spec start_link(Keyword.t()) :: GenServer.on_start()
   def start_link(opts) do
+    Logger.debug("Connection:start_link:#{Base.encode16(Keyword.fetch!(opts, :dcid))}")
     GenServer.start_link(__MODULE__, opts)
   end
 
   @impl GenServer
   def init(opts) do
+    Logger.debug("Connection:init:#{Base.encode16(Keyword.fetch!(opts, :dcid))}")
     state = new(opts)
 
     Process.flag(:trap_exit, true)
@@ -75,10 +78,12 @@ defmodule Requiem.Connection do
       state.conn_state.dcid
     ) do
       {:ok, _pid} ->
+        Logger.debug("Connection:init:registered")
         send(self(), :__accept__)
         {:ok, state}
 
       {:error, {:already_registered, _pid}} ->
+        Logger.debug("Connection:init:failed_to_register")
         {:stop, :normal}
     end
   end
@@ -209,16 +214,19 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def handle_info(:__accept__, state) do
+        Logger.debug("Connection:accept")
     case Requiem.QUIC.Connection.accept(
       state.handler,
       state.conn_state.scid,
       state.conn_state.odcid
     ) do
       {:ok, conn} ->
+        Logger.debug("Connection:accept:complete")
         if state.web_transport do
           # just set conn, don't call handler_init here
           {:noreply, %{state | conn: conn}}
         else
+        Logger.debug("Connection:accept:handle_init")
           handler_init(conn, nil, state)
         end
 
@@ -232,16 +240,20 @@ defmodule Requiem.Connection do
   end
 
   def handle_info(:__timeout__, state) do
+        Logger.debug("Connection:on_timeout")
     case Requiem.QUIC.Connection.on_timeout(state.conn) do
       {:ok, next_timeout} ->
+        Logger.debug("Connection:reset")
         state = reset_conn_timer(state, next_timeout)
         {:noreply, state}
 
       {:error, :already_closed} ->
+        Logger.debug("Connection:already_closed")
         close(false, 0, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
+        Logger.debug("Connection:error")
         close(false, 0, :server_error)
         {:noreply, state}
     end
@@ -251,6 +263,7 @@ defmodule Requiem.Connection do
         {:__stream_recv__, 2, data},
         %{web_transport: true, handler_initialized: false} = state
       ) do
+        Logger.debug("Connection:stream_recv")
     case Requiem.ClientIndication.from_binary(data) do
       {:ok, client} ->
         handler_init(state.conn, client, state)
@@ -267,6 +280,7 @@ defmodule Requiem.Connection do
         %{web_transport: true, handler_initialized: true} = state
       ) do
     # just ignore
+        Logger.debug("Connection:stream_recv:2")
     {:noreply, state}
   end
 
@@ -368,16 +382,18 @@ defmodule Requiem.Connection do
   def handle_info({:__close__, app, err, reason}, state) do
     case Requiem.QUIC.Connection.close(state.conn, app, err, to_string(reason)) do
       :ok ->
-        GenServer.stop(self(), {:shutdown, reason})
+        send(self(), {:__delayed_close__, reason})
 
       {:error, :already_closed} ->
-        GenServer.stop(self(), {:shutdown, reason})
+        send(self(), {:__delayed_close__, :normal})
 
       {:error, :system_error} ->
-        GenServer.stop(self(), {:shutdown, :system_error})
+        send(self(), {:__delayed_close__, {:shutdown, :system_error}})
     end
-
     {:noreply, state}
+  end
+  def handle_info({:__delayed_close__, reason}, state) do
+    {:stop, reason, state}
   end
 
   def handle_info({:__stream_send__, stream_id, data}, state) do
@@ -413,6 +429,7 @@ defmodule Requiem.Connection do
   end
 
   def handle_info({:__drain__, data}, state) do
+    Logger.debug("Connection:drain")
     state.transport.send(
       state.handler,
       state.conn_state.address,
@@ -553,6 +570,7 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def terminate(reason, state) do
+    Logger.debug("Connection:terminate:#{Base.encode16(state.conn_state.dcid)}")
 
     state = cancel_conn_timer(state)
 
