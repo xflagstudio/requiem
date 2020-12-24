@@ -1,6 +1,6 @@
 # [WIP] ReQUIem
 
-QUIC framework for Elixir.
+QuicTransport (WebTransport over QUIC) framework for Elixir.
 This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche) for QUIC protocol part.
 
 Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
