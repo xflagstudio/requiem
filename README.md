@@ -27,15 +27,15 @@ be found at [https://hexdocs.pm/requiem](https://hexdocs.pm/requiem).
 
 ## Getting Started
 
-https://github.com/lyokato/requiem/wiki/GettingStarted
+https://github.com/xflagstudio/requiem/wiki/GettingStarted
 
 ## Handler
 
-https://github.com/lyokato/requiem/wiki/Handler
+https://github.com/xflagstudio/requiem/wiki/Handler
 
 ## Configuration
 
-https://github.com/lyokato/requiem/wiki/Configuration
+https://github.com/xflagstudio/requiem/wiki/Configuration
 
 ## LICENSE
 
