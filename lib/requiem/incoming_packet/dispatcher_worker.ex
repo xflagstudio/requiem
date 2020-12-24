@@ -134,7 +134,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     end
   end
 
-  defp handle_init_packet(address, packet, scid, dcid, token, state) do
+  defp handle_init_packet(address, packet, scid, dcid, token, state) when byte_size(dcid) == 20 do
     case Requiem.QUIC.RetryToken.validate(address, state.token_secret, token) do
       {:ok, odcid, _retry_scid} ->
         Logger.debug("validate success: ODCID: #{Base.encode16(odcid)}")
@@ -162,5 +162,9 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         Logger.debug("validate failed: SCID: #{Base.encode16(scid)}")
         :error
     end
+  end
+  defp handle_init_packet(_address, _packet, _scid, _dcid, _token, _state) do
+    Logger.debug("Validation failed DCID is invalid")
+    :error
   end
 end
