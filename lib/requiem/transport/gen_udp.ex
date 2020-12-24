@@ -58,11 +58,13 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
+    Logger.debug("udp:send")
     send_packet(state.sock, address, packet)
     {:noreply, state}
   end
 
   def handle_cast({:batch_send, batch}, state) do
+    Logger.debug("udp:back_send")
     batch
     |> Enum.each(fn {address, packet} ->
       send_packet(state.sock, address, packet)
@@ -73,6 +75,7 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_info({:udp, _sock, address, port, data}, state) do
+    Logger.debug("incoming udp packet")
     packet = IO.iodata_to_binary(data)
 
     if byte_size(data) <= @max_quic_packet_size do
@@ -83,6 +86,12 @@ defmodule Requiem.Transport.GenUDP do
       )
     end
 
+    {:noreply, state}
+  end
+  def handle_info(request, state) do
+    if state.loggable do
+      Logger.debug("<Requiem.Transport.UDP> unsupported handle_info: #{inspect request}")
+    end
     {:noreply, state}
   end
 
@@ -101,7 +110,8 @@ defmodule Requiem.Transport.GenUDP do
 
   defp send_packet(sock, address, packet) do
     header = Requiem.Address.to_udp_header(address)
-    Port.command(sock, [header, packet])
+    #Port.command(sock, [header, packet])
+    :erlang.port_command(sock, [header, packet])
   end
 
   defp name(handler),

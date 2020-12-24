@@ -406,7 +406,7 @@ defmodule Requiem.Connection do
   end
 
   def handle_info({:__drain__, data}, state) do
-    state.transport.send(state.conn_state.address, data)
+    state.transport.send(state.handler, state.conn_state.address, data)
     {:noreply, state}
   end
 
