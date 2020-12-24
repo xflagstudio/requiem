@@ -70,7 +70,10 @@ defmodule Requiem.Connection do
 
     Process.flag(:trap_exit, true)
 
-    case Requiem.ConnectionRegistry.register(state.handler, state.dcid) do
+    case Requiem.ConnectionRegistry.register(
+      state.handler,
+      state.conn_state.dcid
+    ) do
       {:ok, _pid} ->
         send(self(), :__accept__)
         {:ok, state}
@@ -206,7 +209,11 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def handle_info(:__accept__, state) do
-    case Requiem.QUIC.Connection.accept(state.handler, state.scid, state.odcid) do
+    case Requiem.QUIC.Connection.accept(
+      state.handler,
+      state.conn_state.scid,
+      state.conn_state.odcid
+    ) do
       {:ok, conn} ->
         if state.web_transport do
           # just set conn, don't call handler_init here
@@ -406,7 +413,11 @@ defmodule Requiem.Connection do
   end
 
   def handle_info({:__drain__, data}, state) do
-    state.transport.send(state.handler, state.conn_state.address, data)
+    state.transport.send(
+      state.handler,
+      state.conn_state.address,
+      data
+    )
     {:noreply, state}
   end
 
@@ -542,8 +553,13 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def terminate(reason, state) do
+
     state = cancel_conn_timer(state)
-    Requiem.ConnectionRegistry.unregister(state.handler, state.dcid)
+
+    Requiem.ConnectionRegistry.unregister(
+      state.handler,
+      state.conn_state.dcid
+    )
 
     if state.handler_initialized do
       ExceptionGuard.guard(
@@ -591,7 +607,7 @@ defmodule Requiem.Connection do
   defp new(opts) do
     dcid = Keyword.fetch!(opts, :dcid)
     scid = Keyword.fetch!(opts, :scid)
-    odcid = Keyword.fetch!(opts, :ocid)
+    odcid = Keyword.fetch!(opts, :odcid)
     address = Keyword.fetch!(opts, :address)
 
     %__MODULE__{

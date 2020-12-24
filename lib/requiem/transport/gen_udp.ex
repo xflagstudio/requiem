@@ -116,9 +116,10 @@ defmodule Requiem.Transport.GenUDP do
   end
 
   defp send_packet(sock, address, packet) do
-    Logger.debug("address:#{inspect address}")
-    header = Requiem.Address.to_udp_header(address)
-    Port.command(sock, [header, packet])
+    # TODO better performance
+    #header = Requiem.Address.to_udp_header(address)
+    #Port.command(sock, [header, packet])
+    :gen_udp.send(sock, address.host, address.port, packet)
   end
 
   defp name(handler),
