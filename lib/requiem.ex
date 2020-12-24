@@ -67,7 +67,7 @@ defmodule Requiem do
     quote location: :keep, bind_quoted: [opts: opts] do
       @behaviour Requiem
 
-      use Requiem.QUIC.StreamId
+      use Requiem.StreamId
       import Requiem.ConnectionState, only: [trap_exit: 2]
 
       @spec close() :: no_return

@@ -3,7 +3,7 @@ defmodule RequiemTest.ConnectionStateTest do
 
   alias Requiem.ConnectionState
   alias Requiem.Address
-  alias Requiem.QUIC.StreamId
+  alias Requiem.StreamId
 
   test "connection state's stream_id" do
     addr = Address.new({192, 168, 0, 1}, 8080)

@@ -1,4 +1,4 @@
-defmodule Requiem.QUIC.StreamId do
+defmodule Requiem.StreamId do
   @type orientation :: :bidi | :uni
   @type initiator :: :server | :client
 
