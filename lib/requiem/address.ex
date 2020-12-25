@@ -52,12 +52,23 @@ defmodule Requiem.Address do
   end
 
   @spec to_udp_header(t) :: list
-  def to_udp_header(%__MODULE__{host: {n1, n2, n3, n4}, port: port}) do
+  def to_udp_header(%__MODULE__{host: {_, _, _, _}=host, port: port}) do
+    [1, int16(port) , ip4_to_bytes(host)]
+  end
+
+  def to_udp_header(%__MODULE__{host: {_, _, _, _, _, _, _, _}=host, port: port}) do
+    [2, int16(port) , ip6_to_bytes(host)]
+  end
+
+  defp int16(port) do
     [
-      # inet address family IPv4
-      1,
       band(bsr(port, 8), 0xFF),
-      band(port, 0xFF),
+      band(port, 0xFF)
+    ]
+  end
+
+  defp ip4_to_bytes({n1, n2, n3, n4}) do
+    [
       band(n1, 0xFF),
       band(n2, 0xFF),
       band(n3, 0xFF),
@@ -65,13 +76,8 @@ defmodule Requiem.Address do
     ]
   end
 
-  def to_udp_header(%__MODULE__{host: {n1, n2, n3, n4, n5, n6, n7, n8}, port: port}) do
+  defp ip6_to_bytes({n1, n2, n3, n4, n5, n6, n7, n8}) do
     [
-      # inet address family IPv6
-      2,
-      band(bsr(port, 8), 0xFF),
-      band(port, 0xFF),
-      band(bsr(n1, 8), 0xFF),
       band(n1, 0xFF),
       band(bsr(n2, 8), 0xFF),
       band(n2, 0xFF),
@@ -90,3 +96,4 @@ defmodule Requiem.Address do
     ]
   end
 end
+

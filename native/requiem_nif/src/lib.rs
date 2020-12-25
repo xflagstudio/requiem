@@ -389,18 +389,10 @@ fn connection_on_packet(env: Env, pid: LocalPid,
     if !c.is_closed() {
         match c.recv(&mut packet.as_mut_slice()) {
             Ok(_len) => {
-
-              connection_handle_streams(&env, &pid, &mut c, &mut *b);
-              connection_handle_dgram(&env, &pid, &mut c, &mut *b);
-              connection_drain(&env, &pid, &mut c, &mut *b);
-
-              if let Some(timeout) = c.timeout() {
-                  let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
-                  Ok((atoms::ok(), to))
-              } else {
-                  Err(error_term(atoms::already_closed()))
-              }
-
+                connection_handle_streams(&env, &pid, &mut c, &mut *b);
+                connection_handle_dgram(&env, &pid, &mut c, &mut *b);
+                connection_drain(&env, &pid, &mut c, &mut *b);
+                connection_next_timeout(&c)
             },
 
             Err(_) =>
@@ -423,13 +415,7 @@ fn connection_on_timeout(env: Env, pid: LocalPid,
 
         c.on_timeout();
         connection_drain(&env, &pid, &mut c, &mut *b);
-
-        if let Some(timeout) = c.timeout() {
-            let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
-            Ok((atoms::ok(), to))
-        } else {
-            Err(error_term(atoms::already_closed()))
-        }
+        connection_next_timeout(&c)
 
     } else {
         Err(error_term(atoms::already_closed()))
@@ -463,12 +449,7 @@ fn connection_stream_send(env: Env, pid: LocalPid,
             };
         }
 
-        if let Some(timeout) = c.timeout() {
-            let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
-            Ok((atoms::ok(), to))
-        } else {
-            Err(error_term(atoms::already_closed()))
-        }
+        connection_next_timeout(&c)
 
     } else {
 
@@ -489,15 +470,8 @@ fn connection_dgram_send(env: Env, pid: LocalPid,
 
         match c.dgram_send(&data) {
             Ok(()) => {
-
                 connection_drain(&env, &pid, &mut c, &mut *b);
-
-                if let Some(timeout) = c.timeout() {
-                    let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
-                    Ok((atoms::ok(), to))
-                } else {
-                    Err(error_term(atoms::already_closed()))
-                }
+                connection_next_timeout(&c)
             },
             Err(_) => {
                 return Err(error_term(atoms::system_error()));
@@ -510,6 +484,17 @@ fn connection_dgram_send(env: Env, pid: LocalPid,
 
     }
 }
+
+fn connection_next_timeout(conn: &Pin<Box<quiche::Connection>>)
+    -> NifResult<(Atom, u64)> {
+    if let Some(timeout) = conn.timeout() {
+        let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
+        Ok((atoms::ok(), to))
+    } else {
+        Ok((atoms::ok(), 60000))
+    }
+}
+
 
 fn connection_handle_streams(env: &Env, pid: &LocalPid,
     conn: &mut Pin<Box<quiche::Connection>>, mut buf: &mut [u8]) {

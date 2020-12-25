@@ -51,7 +51,8 @@ defmodule Requiem.Config do
     dispatcher_pool_max_overflow: 0,
     quic_token_secret: :crypto.strong_rand_bytes(16),
     quic_connection_id_secret: :crypto.strong_rand_bytes(32),
-    quic_dgram_queue_size: 1000
+    quic_dgram_queue_size: 1000,
+    quic_max_idle_timeout: 60_000,
   ]
 
   @spec get!(module, config_key) :: term
