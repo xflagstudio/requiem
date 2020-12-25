@@ -8,6 +8,7 @@ defmodule Requiem.ConnectionSupervisor do
   use DynamicSupervisor
 
   alias Requiem.Address
+  alias Requiem.AddressTable
   alias Requiem.Connection
   alias Requiem.ConnectionRegistry
 
@@ -28,7 +29,7 @@ defmodule Requiem.ConnectionSupervisor do
       "<Requiem.ConectionSupervisor> loopup from registry: dcid:#{Base.encode16(dcid)}"
     )
 
-    case ConnectionRegistry.lookup(handler, dcid) do
+    case lookup_connection(handler, dcid, address) do
       {:ok, pid} ->
         Logger.debug(
           "<Requiem.ConnectionSupervisor> found connection, pass packet to this process"
@@ -40,13 +41,25 @@ defmodule Requiem.ConnectionSupervisor do
       {:error, :not_found} ->
         if trace do
           Logger.debug(
-            "<Requiem.ConnectionSupervisor> connection for #{Base.encode16(dcid)} not found, ignore this packet"
+            "<Requiem.ConnectionSupervisor> connection for #{Base.encode16(dcid)} not found, ignore"
           )
         end
 
         :ok
     end
   end
+
+  defp lookup_connection(handler, <<>>, address) do
+    case AddressTable.lookup(handler, address) do
+      {:ok, dcid} ->
+        ConnectionRegistry.lookup(handler, dcid)
+
+      {:error, :not_found} ->
+        {:error, :not_found}
+    end
+  end
+
+  defp lookup_connection(handler, dcid, _address), do: ConnectionRegistry.lookup(handler, dcid)
 
   @spec create_connection(module, module, Address.t(), binary, binary, binary, boolean) ::
           :ok | {:error, :system_error}

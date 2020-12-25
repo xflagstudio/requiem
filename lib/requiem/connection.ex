@@ -79,6 +79,13 @@ defmodule Requiem.Connection do
          ) do
       {:ok, _pid} ->
         debug("@init: registered", state)
+
+        Requiem.AddressTable.insert(
+          state.handler,
+          state.conn_state.address,
+          state.conn_state.dcid
+        )
+
         send(self(), :__accept__)
         {:ok, state}
 
@@ -603,6 +610,11 @@ defmodule Requiem.Connection do
     Requiem.ConnectionRegistry.unregister(
       state.handler,
       state.conn_state.dcid
+    )
+
+    Requiem.AddressTable.delete(
+      state.handler,
+      state.conn_state.address
     )
 
     if state.handler_initialized do

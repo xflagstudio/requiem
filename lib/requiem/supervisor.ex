@@ -3,6 +3,7 @@ defmodule Requiem.Supervisor do
   Root supervisor for all Requiem process tree.
   """
   use Supervisor
+  alias Requiem.AddressTable
   alias Requiem.Config
   alias Requiem.QUIC
   alias Requiem.ConnectionRegistry
@@ -30,6 +31,7 @@ defmodule Requiem.Supervisor do
   def init([handler, otp_app]) do
     handler |> QUIC.init()
     handler |> Config.setup(otp_app)
+    handler |> AddressTable.init()
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
 

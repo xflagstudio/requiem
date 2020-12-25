@@ -93,7 +93,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     }
   end
 
-  defp handle_regular_packet(address, packet, scid, dcid, state) do
+  defp handle_regular_packet(address, packet, scid, dcid, state)
+       when byte_size(dcid) == 20 or byte_size(dcid) == 0 do
     Requiem.ConnectionSupervisor.dispatch_packet(
       state.handler,
       address,
@@ -102,6 +103,11 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       dcid,
       state.trace
     )
+  end
+
+  defp handle_regular_packet(_address, _packet, scid, dcid, state) do
+    debug("@regular: bad dcid", scid, dcid, "", state)
+    :ok
   end
 
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
@@ -130,14 +136,16 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     end
   end
 
-  defp handle_init_packet(address, packet, scid, dcid, token, state) when byte_size(dcid) == 20 do
+  defp handle_init_packet(address, packet, scid, dcid, token, state)
+       when byte_size(dcid) == 20 or byte_size(dcid) == 0 do
     debug("@validate", dcid, scid, "", state)
 
     case Requiem.QUIC.RetryToken.validate(address, state.token_secret, token) do
       {:ok, odcid, _retry_scid} ->
         debug("@validate: success", dcid, scid, odcid, state)
 
-        case Requiem.ConnectionSupervisor.create_connection(
+        # DCIDが0でなければ
+        case create_connection_if_needed(
                state.handler,
                state.transport,
                address,
@@ -162,6 +170,22 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   defp handle_init_packet(_address, _packet, scid, dcid, _token, state) do
     debug("@validate: bad dcid", dcid, scid, "", state)
     :error
+  end
+
+  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid, _trace) do
+    :ok
+  end
+
+  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid, trace) do
+    Requiem.ConnectionSupervisor.create_connection(
+      handler,
+      transport,
+      address,
+      scid,
+      dcid,
+      odcid,
+      trace
+    )
   end
 
   defp debug(message, dcid, scid, odcid, %__MODULE__{trace: true}) do
