@@ -34,7 +34,7 @@ defmodule Requiem.Supervisor do
   end
 
   defp children(handler) do
-    loggable = handler |> Config.get!(:loggable)
+    trace = handler |> Config.get!(:trace)
 
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
@@ -55,14 +55,14 @@ defmodule Requiem.Supervisor do
          conn_id_secret: handler |> Config.get!(:quic_connection_id_secret),
          pool_size: handler |> Config.get!(:dispatcher_pool_size),
          pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
-         loggable: loggable
+         trace: trace
        ]},
       {GenUDP,
        [
          handler: handler,
          dispatcher: DispatcherPool,
          port: handler |> Config.get!(:port),
-         loggable: loggable
+         trace: trace
        ]}
     ]
   end

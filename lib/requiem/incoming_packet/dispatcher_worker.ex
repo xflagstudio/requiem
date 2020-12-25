@@ -7,14 +7,14 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
           transport: module,
           token_secret: binary,
           conn_id_secret: binary,
-          loggable: boolean
+          trace: boolean
         }
 
   defstruct handler: nil,
             transport: nil,
             token_secret: "",
             conn_id_secret: "",
-            loggable: false
+            trace: false
 
   @spec dispatch(pid, Requiem.Address.t(), iodata()) ::
           :ok | {:error, :timeout}
@@ -43,27 +43,23 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   def handle_call({:packet, address, packet}, _from, state) do
     case Requiem.QUIC.Packet.parse_header(packet) do
       {:ok, scid, dcid, _token, _version, false, _version_supported} ->
-        Logger.debug("regular: DCID #{Base.encode16(dcid)}")
-        Logger.debug("regular: SCID #{Base.encode16(scid)}")
+        debug("@regular", dcid, scid, "", state)
         handle_regular_packet(address, packet, scid, dcid, state)
 
       {:ok, scid, dcid, _token, _version, true, false} ->
-        Logger.debug("unsupported ver: DCID #{Base.encode16(dcid)}")
-        Logger.debug("unsupported ver: SCID #{Base.encode16(scid)}")
+        debug("@unsupported_version", dcid, scid, "", state)
         handle_version_unsupported_packet(address, scid, dcid, state)
 
       {:ok, scid, dcid, <<>>, version, true, true} ->
-        Logger.debug("token missing: DCID #{Base.encode16(dcid)}")
-        Logger.debug("token missing: SCID #{Base.encode16(scid)}")
+        debug("@token_missing", dcid, scid, "", state)
         handle_token_missing_packet(address, scid, dcid, version, state)
 
       {:ok, scid, dcid, token, _version, true, true} ->
-        Logger.debug("init: DCID #{Base.encode16(dcid)}")
-        Logger.debug("init: SCID #{Base.encode16(scid)}")
+        debug("@init_with_token", dcid, scid, "", state)
         handle_init_packet(address, packet, scid, dcid, token, state)
 
       {:error, reason} ->
-        if state.loggable do
+        if state.trace do
           Logger.debug(
             "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> bad formatted packet: #{
               inspect(reason)
@@ -78,7 +74,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   end
 
   def handle_call(_ev, _from, state) do
-    if state.loggable do
+    if state.trace do
       Logger.info(
         "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> unknown handle_call pattern"
       )
@@ -93,7 +89,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       transport: Keyword.fetch!(opts, :transport),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
-      loggable: Keyword.get(opts, :loggable, false)
+      trace: Keyword.get(opts, :trace, false)
     }
   end
 
@@ -104,7 +100,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       packet,
       scid,
       dcid,
-      state.loggable
+      state.trace
     )
   end
 
@@ -135,11 +131,11 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   end
 
   defp handle_init_packet(address, packet, scid, dcid, token, state) when byte_size(dcid) == 20 do
+    debug("@validate", dcid, scid, "", state)
+
     case Requiem.QUIC.RetryToken.validate(address, state.token_secret, token) do
       {:ok, odcid, _retry_scid} ->
-        Logger.debug("validate success: ODCID: #{Base.encode16(odcid)}")
-        Logger.debug("validate success: DCID: #{Base.encode16(dcid)}")
-        Logger.debug("validate success: SCID: #{Base.encode16(scid)}")
+        debug("@validate: success", dcid, scid, odcid, state)
 
         case Requiem.ConnectionSupervisor.create_connection(
                state.handler,
@@ -148,7 +144,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
                scid,
                dcid,
                odcid,
-               state.loggable
+               state.trace
              ) do
           :ok ->
             handle_regular_packet(address, packet, scid, dcid, state)
@@ -158,13 +154,23 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         end
 
       :error ->
-        Logger.debug("validate failed: DCID: #{Base.encode16(dcid)}")
-        Logger.debug("validate failed: SCID: #{Base.encode16(scid)}")
+        debug("@validate: error", dcid, scid, "", state)
         :error
     end
   end
-  defp handle_init_packet(_address, _packet, _scid, _dcid, _token, _state) do
-    Logger.debug("Validation failed DCID is invalid")
+
+  defp handle_init_packet(_address, _packet, scid, dcid, _token, state) do
+    debug("@validate: bad dcid", dcid, scid, "", state)
     :error
   end
+
+  defp debug(message, dcid, scid, odcid, %__MODULE__{trace: true}) do
+    Logger.debug(
+      "<Requiem.IncomingPacket.DispatcherWorker> #{message} <dcid:#{Base.encode16(dcid)}, scid: #{
+        Base.encode16(scid)
+      }, odcid: #{Base.encode16(odcid)}>"
+    )
+  end
+
+  defp debug(_message, _dcid, _scid, _odcid, _state), do: :ok
 end

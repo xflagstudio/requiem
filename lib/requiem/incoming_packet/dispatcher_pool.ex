@@ -42,7 +42,7 @@ defmodule Requiem.IncomingPacket.DispatcherPool do
     transport = Keyword.fetch!(opts, :transport)
     token_secret = Keyword.fetch!(opts, :token_secret)
     conn_id_secret = Keyword.fetch!(opts, :conn_id_secret)
-    loggable = Keyword.get(opts, :loggable, false)
+    trace = Keyword.get(opts, :trace, false)
     size = Keyword.fetch!(opts, :pool_size)
     overflow = Keyword.fetch!(opts, :pool_max_overflow)
 
@@ -54,7 +54,7 @@ defmodule Requiem.IncomingPacket.DispatcherPool do
       transport: transport,
       token_secret: token_secret,
       conn_id_secret: conn_id_secret,
-      loggable: loggable
+      trace: trace
     ]
 
     [:poolboy.child_spec(name, pool_opts, dispatcher_opts)]

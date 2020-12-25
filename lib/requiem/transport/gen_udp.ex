@@ -9,14 +9,14 @@ defmodule Requiem.Transport.GenUDP do
   @type t :: %__MODULE__{
           handler: module,
           dispatcher: module,
-          loggable: boolean,
+          trace: boolean,
           port: non_neg_integer,
           sock: port
         }
 
   defstruct handler: nil,
             dispatcher: nil,
-            loggable: false,
+            trace: false,
             port: 0,
             sock: nil
 
@@ -39,8 +39,8 @@ defmodule Requiem.Transport.GenUDP do
 
     case :gen_udp.open(state.port, [:binary, active: true]) do
       {:ok, sock} ->
-        if state.loggable do
-          Logger.debug("<Requiem.Transport.UDP> opened UDP port #{inspect(state.port)}")
+        if state.trace do
+          Logger.debug("<Requiem.Transport.GenUDP> opened UDP port #{inspect(state.port)}")
         end
 
         Process.flag(:trap_exit, true)
@@ -48,7 +48,7 @@ defmodule Requiem.Transport.GenUDP do
 
       {:error, reason} ->
         Logger.error(
-          "<Requiem.Transport.UDP> failed to open UDP port #{to_string(state.port)}: #{
+          "<Requiem.Transport.GenUDP> failed to open UDP port #{to_string(state.port)}: #{
             inspect(reason)
           }"
         )
@@ -59,13 +59,13 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
-    Logger.debug("udp:send")
+    Logger.debug("<Requiem.Transport.GenUDP> send")
     send_packet(state.sock, address, packet)
     {:noreply, state}
   end
 
   def handle_cast({:batch_send, batch}, state) do
-    Logger.debug("udp:back_send")
+    Logger.debug("<Requiem.Transport.GenUDP> batch_send")
 
     batch
     |> Enum.each(fn {address, packet} ->
@@ -77,10 +77,12 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_info({:udp, _sock, address, port, data}, state) do
-    Logger.debug("incoming udp packet")
+    Logger.debug("<Requiem.Transport.GenUDP> received")
     packet = IO.iodata_to_binary(data)
 
     if byte_size(data) <= @max_quic_packet_size do
+      Logger.debug("<Requiem.Transport.GenUDP> size is OK, dispatch")
+
       state.dispatcher.dispatch(
         state.handler,
         Requiem.Address.new(address, port),
@@ -90,20 +92,23 @@ defmodule Requiem.Transport.GenUDP do
 
     {:noreply, state}
   end
+
   def handle_info({:inet_reply, _, :ok}, state) do
     {:noreply, state}
   end
+
   def handle_info(request, state) do
-    if state.loggable do
-      Logger.debug("<Requiem.Transport.UDP> unsupported handle_info: #{inspect(request)}")
+    if state.trace do
+      Logger.debug("<Requiem.Transport.GenUDP> unsupported handle_info: #{inspect(request)}")
     end
+
     {:noreply, state}
   end
 
   @impl GenServer
   def terminate(reason, state) do
-    if state.loggable do
-      Logger.debug("<Requiem.Transport.UDP> terminated: #{inspect(reason)}")
+    if state.trace do
+      Logger.debug("<Requiem.Transport.GenUDP> terminated: #{inspect(reason)}")
     end
 
     :gen_udp.close(state.sock)
@@ -115,14 +120,14 @@ defmodule Requiem.Transport.GenUDP do
       handler: Keyword.fetch!(opts, :handler),
       dispatcher: Keyword.fetch!(opts, :dispatcher),
       port: Keyword.fetch!(opts, :port),
-      loggable: Keyword.get(opts, :loggable, false),
+      trace: Keyword.get(opts, :trace, false),
       sock: nil
     }
   end
 
   defp send_packet(sock, address, packet) do
-    #header = Requiem.Address.to_udp_header(address)
-    #:erlang.port_command(sock, [header, packet])
+    # header = Requiem.Address.to_udp_header(address)
+    # :erlang.port_command(sock, [header, packet])
     :gen_udp.send(sock, address.host, address.port, packet)
   end
 

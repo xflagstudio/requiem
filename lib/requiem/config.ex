@@ -8,7 +8,7 @@ defmodule Requiem.Config do
   @type config_key ::
           :web_transport
           | :port
-          | :loggable
+          | :trace
           | :sender_buffering_interval
           | :sender_pool_size
           | :sender_pool_max_overflow
@@ -43,7 +43,7 @@ defmodule Requiem.Config do
   @default_values [
     web_transport: true,
     port: 443,
-    loggable: false,
+    trace: false,
     sender_buffering_interval: 0,
     sender_pool_size: 10,
     sender_pool_max_overflow: 0,
@@ -52,7 +52,7 @@ defmodule Requiem.Config do
     quic_token_secret: :crypto.strong_rand_bytes(16),
     quic_connection_id_secret: :crypto.strong_rand_bytes(32),
     quic_dgram_queue_size: 1000,
-    quic_max_idle_timeout: 60_000,
+    quic_max_idle_timeout: 60_000
   ]
 
   @spec get!(module, config_key) :: term

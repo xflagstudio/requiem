@@ -52,12 +52,12 @@ defmodule Requiem.Address do
   end
 
   @spec to_udp_header(t) :: list
-  def to_udp_header(%__MODULE__{host: {_, _, _, _}=host, port: port}) do
-    [1, int16(port) , ip4_to_bytes(host)]
+  def to_udp_header(%__MODULE__{host: {_, _, _, _} = host, port: port}) do
+    [1, int16(port), ip4_to_bytes(host)]
   end
 
-  def to_udp_header(%__MODULE__{host: {_, _, _, _, _, _, _, _}=host, port: port}) do
-    [2, int16(port) , ip6_to_bytes(host)]
+  def to_udp_header(%__MODULE__{host: {_, _, _, _, _, _, _, _} = host, port: port}) do
+    [2, int16(port), ip6_to_bytes(host)]
   end
 
   defp int16(port) do
@@ -96,4 +96,3 @@ defmodule Requiem.Address do
     ]
   end
 end
-

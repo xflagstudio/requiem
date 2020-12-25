@@ -23,17 +23,22 @@ defmodule Requiem.ConnectionSupervisor do
   end
 
   @spec dispatch_packet(module, Address.t(), binary, binary, binary, boolean) :: :ok
-  def dispatch_packet(handler, address, packet, _scid, dcid, loggable) do
-    Logger.debug("loopup from registry: DCID:#{Base.encode16(dcid)}")
+  def dispatch_packet(handler, address, packet, _scid, dcid, trace) do
+    Logger.debug(
+      "<Requiem.ConectionSupervisor> loopup from registry: dcid:#{Base.encode16(dcid)}"
+    )
 
     case ConnectionRegistry.lookup(handler, dcid) do
       {:ok, pid} ->
-        Logger.debug("found, process, packet")
+        Logger.debug(
+          "<Requiem.ConnectionSupervisor> found connection, pass packet to this process"
+        )
+
         Connection.process_packet(pid, address, packet)
         :ok
 
       {:error, :not_found} ->
-        if loggable do
+        if trace do
           Logger.debug(
             "<Requiem.ConnectionSupervisor> connection for #{Base.encode16(dcid)} not found, ignore this packet"
           )
@@ -45,8 +50,8 @@ defmodule Requiem.ConnectionSupervisor do
 
   @spec create_connection(module, module, Address.t(), binary, binary, binary, boolean) ::
           :ok | {:error, :system_error}
-  def create_connection(handler, transport, address, scid, dcid, odcid, loggable) do
-    Logger.debug("create cnonection: DCID:#{Base.encode16(dcid)}")
+  def create_connection(handler, transport, address, scid, dcid, odcid, trace) do
+    Logger.debug("<Requiem.ConnectionSupervisor> create cnonection: DCID:#{Base.encode16(dcid)}")
 
     case ConnectionRegistry.lookup(handler, dcid) do
       {:error, :not_found} ->
@@ -57,12 +62,12 @@ defmodule Requiem.ConnectionSupervisor do
           dcid: dcid,
           scid: scid,
           odcid: odcid,
-          loggable: loggable
+          trace: trace
         ]
 
         case start_child(opts) do
           {:error, reason} ->
-            if loggable do
+            if trace do
               Logger.info(
                 "<Requiem.ConnectionSupervisor> failed to start connection: #{inspect(reason)}"
               )
@@ -75,7 +80,7 @@ defmodule Requiem.ConnectionSupervisor do
         end
 
       {:ok, _pid} ->
-        if loggable do
+        if trace do
           Logger.info("<Requiem.ConnectionSupervisor> connection already exists")
         end
 
