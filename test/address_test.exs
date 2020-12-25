@@ -3,7 +3,7 @@ defmodule RequiemTest.AddressTest do
 
   alias Requiem.Address
 
-  test "token protector" do
+  test "address " do
     addr1 = Address.new({192, 168, 0, 1}, 80)
     addr2 = Address.new({192, 168, 0, 1}, 443)
 
