@@ -404,7 +404,7 @@ defmodule Requiem.Connection do
     case Requiem.QUIC.Connection.close(state.conn, app, err, to_string(reason)) do
       :ok ->
         trace("@close: completed, set delayed close", state)
-        send(self(), {:__delayed_close__, reason})
+        send(self(), {:__delayed_close__, {:shutdown, reason}})
 
       {:error, :already_closed} ->
         trace("@close: already closed, set delayed close", state)
@@ -439,7 +439,7 @@ defmodule Requiem.Connection do
 
       {:error, :system_error} ->
         trace("@stream_send: error", state)
-        close(false, 0, :server_error)
+        #close(false, 0, :server_error)
         {:noreply, state}
     end
   end
@@ -460,7 +460,7 @@ defmodule Requiem.Connection do
 
       {:error, :system_error} ->
         trace("@dgram_send: error", state)
-        close(false, 0, :server_error)
+        #close(false, 0, :server_error)
         {:noreply, state}
     end
   end
