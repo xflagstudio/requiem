@@ -230,7 +230,7 @@ defmodule Requiem.Connection do
 
     case Requiem.QUIC.Connection.accept(
            state.handler,
-           state.conn_state.scid,
+           state.conn_state.dcid,
            state.conn_state.odcid
          ) do
       {:ok, conn} ->

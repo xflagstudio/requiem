@@ -46,6 +46,12 @@ mod atoms {
         __drain__,
         __stream_recv__,
         __dgram_recv__,
+        initial, // packet type
+        handshake, // packet type
+        retry, // packet type
+        zero_rtt, // packet type
+        version_negotiation, // packet type
+        short // packet type
     }
 }
 
@@ -565,7 +571,7 @@ fn connection_drain(env: &Env, pid: &LocalPid,
 
 #[rustler::nif]
 fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
-    -> NifResult<(Atom, Binary<'a>, Binary<'a>, Binary<'a>, u32, bool, bool)> {
+    -> NifResult<(Atom, Binary<'a>, Binary<'a>, Binary<'a>, u32, Atom, bool)> {
 
     let mut packet = packet.to_owned().unwrap();
 
@@ -582,7 +588,7 @@ fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
 
             let version = hdr.version;
 
-            let is_initial_frame = hdr.ty == quiche::Type::Initial;
+            let typ = packet_type(hdr.ty);
             let is_version_supported = quiche::version_is_supported(hdr.version);
 
             Ok((
@@ -591,7 +597,7 @@ fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
                 dcid.release(env),
                 token.release(env),
                 version,
-                is_initial_frame,
+                typ,
                 is_version_supported,
             ))
         },
@@ -601,6 +607,17 @@ fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
 
     }
 
+}
+
+fn packet_type(ty: quiche::Type) -> Atom {
+    match ty {
+        quiche::Type::Initial            => atoms::initial(),
+        quiche::Type::Short              => atoms::short(),
+        quiche::Type::VersionNegotiation => atoms::version_negotiation(),
+        quiche::Type::Retry              => atoms::retry(),
+        quiche::Type::Handshake          => atoms::handshake(),
+        quiche::Type::ZeroRTT            => atoms::zero_rtt()
+    }
 }
 
 #[rustler::nif]

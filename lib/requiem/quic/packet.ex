@@ -2,7 +2,7 @@ defmodule Requiem.QUIC.Packet do
   alias Requiem.QUIC.NIF
 
   @spec parse_header(binary) ::
-          {:ok, binary, binary, binary, non_neg_integer, boolean, boolean}
+          {:ok, binary, binary, binary, non_neg_integer, atom, boolean}
           | {:error, :system_error | :bad_format}
   def parse_header(packet) do
     NIF.packet_parse_header(packet)

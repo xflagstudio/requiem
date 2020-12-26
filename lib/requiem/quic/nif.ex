@@ -115,7 +115,7 @@ defmodule Requiem.QUIC.NIF do
   def connection_dgram_send(_pid, _conn, _data), do: error()
 
   @spec packet_parse_header(binary) ::
-          {:ok, binary, binary, binary, non_neg_integer, boolean, boolean}
+          {:ok, binary, binary, binary, non_neg_integer, atom, boolean}
           | {:error, :system_error | :bad_format}
   def packet_parse_header(_packet), do: error()
 

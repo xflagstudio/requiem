@@ -42,21 +42,22 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   @impl GenServer
   def handle_call({:packet, address, packet}, _from, state) do
     case Requiem.QUIC.Packet.parse_header(packet) do
-      {:ok, scid, dcid, _token, _version, false, _version_supported} ->
-        trace("@regular", dcid, scid, "", state)
-        handle_regular_packet(address, packet, scid, dcid, state)
 
-      {:ok, scid, dcid, _token, _version, true, false} ->
+      {:ok, scid, dcid, _token, _version, :initial, false} ->
         trace("@unsupported_version", dcid, scid, "", state)
         handle_version_unsupported_packet(address, scid, dcid, state)
 
-      {:ok, scid, dcid, <<>>, version, true, true} ->
+      {:ok, scid, dcid, <<>>, version, :initial, true} ->
         trace("@token_missing", dcid, scid, "", state)
         handle_token_missing_packet(address, scid, dcid, version, state)
 
-      {:ok, scid, dcid, token, _version, true, true} ->
+      {:ok, scid, dcid, token, _version, :initial, true} ->
         trace("@init_with_token", dcid, scid, "", state)
         handle_init_packet(address, packet, scid, dcid, token, state)
+
+      {:ok, scid, dcid, _token, _version, packet_type, _version_supported} ->
+        trace("@regular: #{packet_type}", dcid, scid, "", state)
+        handle_regular_packet(address, packet, scid, dcid, state)
 
       {:error, reason} ->
         if state.trace do
