@@ -111,24 +111,26 @@ defmodule Requiem.Connection do
                state.conn_state,
                state.handler_state
              ) do
-          {:reply, resp, conn_state, handler_state} ->
+          {:reply, resp, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             {:reply, resp, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-          {:reply, resp, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:reply, resp, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             {:reply, resp, %{state | conn_state: conn_state, handler_state: handler_state},
              timeout}
 
-          {:reply, resp, conn_state, handler_state, :hibernate} ->
+          {:reply, resp, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             {:reply, resp, %{state | conn_state: conn_state, handler_state: handler_state},
              :hibernate}
 
-          {:noreply, conn_state, handler_state} ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-          {:noreply, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, timeout}
 
-          {:noreply, conn_state, handler_state, :hibernate} ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state},
              :hibernate}
 
@@ -190,13 +192,14 @@ defmodule Requiem.Connection do
                state.conn_state,
                state.handler_state
              ) do
-          {:noreply, conn_state, handler_state} ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-          {:noreply, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, timeout}
 
-          {:noreply, conn_state, handler_state, :hibernate} ->
+          {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state},
              :hibernate}
 
@@ -315,13 +318,14 @@ defmodule Requiem.Connection do
                state.conn_state,
                state.handler_state
              ) do
-          {:ok, conn_state, handler_state} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-          {:ok, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, timeout}
 
-          {:ok, conn_state, handler_state, :hibernate} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state},
              :hibernate}
 
@@ -360,13 +364,14 @@ defmodule Requiem.Connection do
                state.conn_state,
                state.handler_state
              ) do
-          {:ok, conn_state, handler_state} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-          {:ok, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, timeout}
 
-          {:ok, conn_state, handler_state, :hibernate} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             {:noreply, %{state | conn_state: conn_state, handler_state: handler_state},
              :hibernate}
 
@@ -464,7 +469,7 @@ defmodule Requiem.Connection do
     trace("@drain", state)
 
     # XXX jsut for debug, remove later
-    {:ok, scid, dcid, _token, _ver, typ, _} = Requiem.QUIC.Packet.parse_header(data)
+    {:ok, _scid, _dcid, _token, _ver, typ, _} = Requiem.QUIC.Packet.parse_header(data)
     trace("@send: #{typ}", state)
 
     state.transport.send(
@@ -519,13 +524,14 @@ defmodule Requiem.Connection do
            state.conn_state,
            state.handler_state
          ) do
-      {:noreply, conn_state, handler_state} ->
+      {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state} ->
         {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}}
 
-      {:noreply, conn_state, handler_state, timeout} when is_integer(timeout) ->
+      {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+      when is_integer(timeout) ->
         {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, timeout}
 
-      {:noreply, conn_state, handler_state, :hibernate} ->
+      {:noreply, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
         {:noreply, %{state | conn_state: conn_state, handler_state: handler_state}, :hibernate}
 
       {:stop, code, reason} when is_integer(code) and is_atom(reason) ->
@@ -550,7 +556,7 @@ defmodule Requiem.Connection do
       end,
       fn ->
         case state.handler.init(state.conn_state, client) do
-          {:ok, conn_state, handler_state} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state} ->
             trace("@handler.init: completed", state)
 
             {:noreply,
@@ -562,7 +568,8 @@ defmodule Requiem.Connection do
                  handler_initialized: true
              }}
 
-          {:ok, conn_state, handler_state, timeout} when is_integer(timeout) ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, timeout}
+          when is_integer(timeout) ->
             trace("@handler.init: completed with timeout", state)
 
             {:noreply,
@@ -574,7 +581,7 @@ defmodule Requiem.Connection do
                  handler_initialized: true
              }, timeout}
 
-          {:ok, conn_state, handler_state, :hibernate} ->
+          {:ok, %Requiem.ConnectionState{} = conn_state, handler_state, :hibernate} ->
             trace("@handler.init: completed with :hibernate", state)
 
             {:noreply,
