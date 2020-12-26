@@ -49,7 +49,8 @@ defmodule Requiem.ConnectionSupervisor do
     end
   end
 
-  defp lookup_connection(handler, <<>>, address) do
+  @spec lookup_connection(module, binary, Address.t()) :: {:ok, binary} | {:error, :not_found}
+  def lookup_connection(handler, <<>>, address) do
     case AddressTable.lookup(handler, address) do
       {:ok, dcid} ->
         ConnectionRegistry.lookup(handler, dcid)
@@ -59,7 +60,7 @@ defmodule Requiem.ConnectionSupervisor do
     end
   end
 
-  defp lookup_connection(handler, dcid, _address), do: ConnectionRegistry.lookup(handler, dcid)
+  def lookup_connection(handler, dcid, _address), do: ConnectionRegistry.lookup(handler, dcid)
 
   @spec create_connection(module, module, Address.t(), binary, binary, binary, boolean) ::
           :ok | {:error, :system_error}
