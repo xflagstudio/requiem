@@ -69,7 +69,7 @@ defmodule Requiem.Connection do
   @impl GenServer
   def init(opts) do
     state = new(opts)
-    debug("@init", state)
+    trace("@init", state)
 
     Process.flag(:trap_exit, true)
 
@@ -78,7 +78,7 @@ defmodule Requiem.Connection do
            state.conn_state.dcid
          ) do
       {:ok, _pid} ->
-        debug("@init: registered", state)
+        trace("@init: registered", state)
 
         Requiem.AddressTable.insert(
           state.handler,
@@ -90,14 +90,14 @@ defmodule Requiem.Connection do
         {:ok, state}
 
       {:error, {:already_registered, _pid}} ->
-        debug("@init: failed registered", state)
+        trace("@init: failed registered", state)
         {:stop, :normal}
     end
   end
 
   @impl GenServer
   def handle_call(request, from, %{handler_initialized: true} = state) do
-    debug("@call: handler_initialized: true", state)
+    trace("@call: handler_initialized: true", state)
 
     ExceptionGuard.guard(
       fn ->
@@ -151,18 +151,18 @@ defmodule Requiem.Connection do
   end
 
   def handle_call(_request, _from, state) do
-    debug("@call: unknown", state)
+    trace("@call: unknown", state)
     # just ignore
     {:reply, :ok, state}
   end
 
   @impl GenServer
   def handle_cast({:__packet__, _address, packet}, state) do
-    debug("@packet", state)
+    trace("@packet", state)
 
     case Requiem.QUIC.Connection.on_packet(state.conn, packet) do
       {:ok, next_timeout} ->
-        debug("@packet: completed, next_timeout: #{next_timeout}", state)
+        trace("@packet: completed, next_timeout: #{next_timeout}", state)
         state = reset_conn_timer(state, next_timeout)
         {:noreply, state}
 
@@ -177,7 +177,7 @@ defmodule Requiem.Connection do
   end
 
   def handle_cast(request, %{handler_initialized: true} = state) do
-    debug("@cast: handler_initialized: true", state)
+    trace("@cast: handler_initialized: true", state)
 
     ExceptionGuard.guard(
       fn ->
@@ -219,14 +219,14 @@ defmodule Requiem.Connection do
   end
 
   def handle_cast(_request, state) do
-    debug("@cast: unknown", state)
+    trace("@cast: unknown", state)
     # just ignore
     {:noreply, state}
   end
 
   @impl GenServer
   def handle_info(:__accept__, state) do
-    debug("@acccept", state)
+    trace("@acccept", state)
 
     case Requiem.QUIC.Connection.accept(
            state.handler,
@@ -234,13 +234,13 @@ defmodule Requiem.Connection do
            state.conn_state.odcid
          ) do
       {:ok, conn} ->
-        debug("@acccept: completed", state)
+        trace("@acccept: completed", state)
 
         if state.web_transport do
           # just set conn, don't call handler_init here
           {:noreply, %{state | conn: conn}}
         else
-          debug("@acccept: handler.init", state)
+          trace("@acccept: handler.init", state)
           handler_init(conn, nil, state)
         end
 
@@ -254,21 +254,21 @@ defmodule Requiem.Connection do
   end
 
   def handle_info(:__timeout__, state) do
-    debug("@timeout", state)
+    trace("@timeout", state)
 
     case Requiem.QUIC.Connection.on_timeout(state.conn) do
       {:ok, next_timeout} ->
-        debug("@timeout: done, next_timeout: #{next_timeout}", state)
+        trace("@timeout: done, next_timeout: #{next_timeout}", state)
         state = reset_conn_timer(state, next_timeout)
         {:noreply, state}
 
       {:error, :already_closed} ->
-        debug("@timeout: already closed", state)
+        trace("@timeout: already closed", state)
         close(false, 0, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
-        debug("@timeout: error", state)
+        trace("@timeout: error", state)
         close(false, 0, :server_error)
         {:noreply, state}
     end
@@ -278,7 +278,7 @@ defmodule Requiem.Connection do
         {:__stream_recv__, 2, data},
         %{web_transport: true, handler_initialized: false} = state
       ) do
-    debug("@stream_recv: handler_initialized: false, web_transport: true, stream_id=2", state)
+    trace("@stream_recv: handler_initialized: false, web_transport: true, stream_id=2", state)
 
     case Requiem.ClientIndication.from_binary(data) do
       {:ok, client} ->
@@ -296,12 +296,12 @@ defmodule Requiem.Connection do
         %{web_transport: true, handler_initialized: true} = state
       ) do
     # just ignore
-    debug("@stream_recv: handler_initialized: true, web_transport: true, stream_id=2", state)
+    trace("@stream_recv: handler_initialized: true, web_transport: true, stream_id=2", state)
     {:noreply, state}
   end
 
   def handle_info({:__stream_recv__, stream_id, data}, %{handler_initialized: true} = state) do
-    debug("@stream_recv: handler_initialized: true", state)
+    trace("@stream_recv: handler_initialized: true", state)
 
     ExceptionGuard.guard(
       fn ->
@@ -394,19 +394,19 @@ defmodule Requiem.Connection do
   end
 
   def handle_info({:__close__, app, err, reason}, state) do
-    debug("@close", state)
+    trace("@close", state)
 
     case Requiem.QUIC.Connection.close(state.conn, app, err, to_string(reason)) do
       :ok ->
-        debug("@close: completed, set delayed close", state)
+        trace("@close: completed, set delayed close", state)
         send(self(), {:__delayed_close__, reason})
 
       {:error, :already_closed} ->
-        debug("@close: already closed, set delayed close", state)
+        trace("@close: already closed, set delayed close", state)
         send(self(), {:__delayed_close__, :normal})
 
       {:error, :system_error} ->
-        debug("@close: error, set delayed close", state)
+        trace("@close: error, set delayed close", state)
         send(self(), {:__delayed_close__, {:shutdown, :system_error}})
     end
 
@@ -414,54 +414,54 @@ defmodule Requiem.Connection do
   end
 
   def handle_info({:__delayed_close__, reason}, state) do
-    debug("@delayed_closed", state)
+    trace("@delayed_closed", state)
     {:stop, reason, state}
   end
 
   def handle_info({:__stream_send__, stream_id, data}, state) do
-    debug("@stream_send", state)
+    trace("@stream_send", state)
 
     case Requiem.QUIC.Connection.stream_send(state.conn, stream_id, data) do
       {:ok, next_timeout} ->
-        debug("@stream_send: completed. next_timeout: #{next_timeout}", state)
+        trace("@stream_send: completed. next_timeout: #{next_timeout}", state)
         state = reset_conn_timer(state, next_timeout)
         {:noreply, state}
 
       {:error, :already_closed} ->
-        debug("@stream_send: already closed", state)
+        trace("@stream_send: already closed", state)
         close(false, 0, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
-        debug("@stream_send: error", state)
+        trace("@stream_send: error", state)
         close(false, 0, :server_error)
         {:noreply, state}
     end
   end
 
   def handle_info({:__dgram_send__, data}, state) do
-    debug("@dgram_send", state)
+    trace("@dgram_send", state)
 
     case Requiem.QUIC.Connection.dgram_send(state.conn, data) do
       {:ok, next_timeout} ->
-        debug("@dgram_send: completed. next_timeout: #{next_timeout}", state)
+        trace("@dgram_send: completed. next_timeout: #{next_timeout}", state)
         state = reset_conn_timer(state, next_timeout)
         {:noreply, state}
 
       {:error, :already_closed} ->
-        debug("@dgram_send: already closed", state)
+        trace("@dgram_send: already closed", state)
         close(false, 0, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
-        debug("@dgram_send: error", state)
+        trace("@dgram_send: error", state)
         close(false, 0, :server_error)
         {:noreply, state}
     end
   end
 
   def handle_info({:__drain__, data}, state) do
-    debug("@drain", state)
+    trace("@drain", state)
 
     state.transport.send(
       state.handler,
@@ -479,7 +479,7 @@ defmodule Requiem.Connection do
         {:noreply, state}
       end,
       fn ->
-        debug("@exit: #{inspect(pid)}", state)
+        trace("@exit: #{inspect(pid)}", state)
 
         if Requiem.ConnectionState.should_delegate_exit?(state.conn_state, pid) do
           new_conn_state = Requiem.ConnectionState.forget_to_trap_exit(state.conn_state, pid)
@@ -547,7 +547,7 @@ defmodule Requiem.Connection do
       fn ->
         case state.handler.init(state.conn_state, client) do
           {:ok, conn_state, handler_state} ->
-            debug("@handler.init: completed", state)
+            trace("@handler.init: completed", state)
 
             {:noreply,
              %{
@@ -559,7 +559,7 @@ defmodule Requiem.Connection do
              }}
 
           {:ok, conn_state, handler_state, timeout} when is_integer(timeout) ->
-            debug("@handler.init: completed with timeout", state)
+            trace("@handler.init: completed with timeout", state)
 
             {:noreply,
              %{
@@ -571,7 +571,7 @@ defmodule Requiem.Connection do
              }, timeout}
 
           {:ok, conn_state, handler_state, :hibernate} ->
-            debug("@handler.init: completed with :hibernate", state)
+            trace("@handler.init: completed with :hibernate", state)
 
             {:noreply,
              %{
@@ -583,7 +583,7 @@ defmodule Requiem.Connection do
              }, :hibernate}
 
           {:stop, code, reason} when is_integer(code) and is_atom(reason) ->
-            debug("@handler.init: stop", state)
+            trace("@handler.init: stop", state)
             close(true, code, reason)
             {:noreply, %{state | handler_initialized: true}}
 
@@ -603,7 +603,7 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def terminate(reason, state) do
-    debug("@terminate #{inspect(reason)}", state)
+    trace("@terminate #{inspect(reason)}", state)
 
     state = cancel_conn_timer(state)
 
@@ -660,15 +660,19 @@ defmodule Requiem.Connection do
     send(self(), {:__close__, app, err, reason})
   end
 
-  def debug(message, %__MODULE__{trace: true} = state) do
+  def trace(message, %__MODULE__{trace: true} = state) do
+    dcid = case state.conn_state.dcid do
+      << head :: binary-size(4), _rest :: binary >> -> head
+      _ -> "----"
+    end
     Logger.debug(
-      "<Requiem.Connection:#{inspect(self())}:#{Base.encode16(state.conn_state.dcid)}> #{message}"
+      "<Requiem.Connection:#{inspect(self())}:#{Base.encode16(dcid)}> #{message}"
     )
 
     :ok
   end
 
-  def debug(_message, _state) do
+  def trace(_message, _state) do
     :ok
   end
 
