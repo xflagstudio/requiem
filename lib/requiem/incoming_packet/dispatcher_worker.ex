@@ -20,7 +20,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
           :ok | {:error, :timeout}
   def dispatch(pid, address, packet) do
     try do
-      GenServer.call(pid, {:packet, address, packet}, 50)
+      GenServer.call(pid, {:packet, address, packet}, 100)
       :ok
     catch
       :exit, _ ->

@@ -436,6 +436,7 @@ fn connection_stream_send(env: Env, pid: LocalPid,
     let mut c = conn.conn.lock().unwrap();
     let mut b = conn.buf.lock().unwrap();
     let data = data.as_slice();
+    let size = data.len();
 
     if !c.is_closed() {
 
@@ -445,6 +446,9 @@ fn connection_stream_send(env: Env, pid: LocalPid,
                 Ok(len) => {
                     pos += len;
                     connection_drain(&env, &pid, &mut c, &mut *b);
+                    if pos >= size {
+                        break;
+                    }
                 },
                 Err(quiche::Error::Done) => {
                     break;
