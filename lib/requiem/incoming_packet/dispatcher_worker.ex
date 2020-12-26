@@ -42,7 +42,6 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   @impl GenServer
   def handle_call({:packet, address, packet}, _from, state) do
     case Requiem.QUIC.Packet.parse_header(packet) do
-
       {:ok, scid, dcid, _token, _version, :initial, false} ->
         trace("@unsupported_version", dcid, scid, "", state)
         handle_version_unsupported_packet(address, scid, dcid, state)

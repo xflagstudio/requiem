@@ -661,13 +661,13 @@ defmodule Requiem.Connection do
   end
 
   def trace(message, %__MODULE__{trace: true} = state) do
-    dcid = case state.conn_state.dcid do
-      << head :: binary-size(4), _rest :: binary >> -> head
-      _ -> "----"
-    end
-    Logger.debug(
-      "<Requiem.Connection:#{inspect(self())}:#{Base.encode16(dcid)}> #{message}"
-    )
+    dcid =
+      case state.conn_state.dcid do
+        <<head::binary-size(4), _rest::binary>> -> head
+        _ -> "----"
+      end
+
+    Logger.debug("<Requiem.Connection:#{inspect(self())}:#{Base.encode16(dcid)}> #{message}")
 
     :ok
   end
