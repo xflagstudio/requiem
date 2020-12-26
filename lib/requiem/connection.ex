@@ -463,6 +463,10 @@ defmodule Requiem.Connection do
   def handle_info({:__drain__, data}, state) do
     trace("@drain", state)
 
+    # XXX jsut for debug, remove later
+    {:ok, scid, dcid, _token, _ver, typ, _} = Requiem.QUIC.Packet.parse_header(data)
+    trace("@send: #{typ}", state)
+
     state.transport.send(
       state.handler,
       state.conn_state.address,

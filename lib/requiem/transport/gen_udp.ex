@@ -59,13 +59,13 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
-    Logger.debug("<Requiem.Transport.GenUDP> send")
+    Logger.debug("<Requiem.Transport.GenUDP> @send")
     send_packet(state.sock, address, packet)
     {:noreply, state}
   end
 
   def handle_cast({:batch_send, batch}, state) do
-    Logger.debug("<Requiem.Transport.GenUDP> batch_send")
+    Logger.debug("<Requiem.Transport.GenUDP> @batch_send")
 
     batch
     |> Enum.each(fn {address, packet} ->
@@ -77,7 +77,7 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def handle_info({:udp, _sock, address, port, data}, state) do
-    Logger.debug("<Requiem.Transport.GenUDP> received")
+    Logger.debug("<Requiem.Transport.GenUDP> @received")
     packet = IO.iodata_to_binary(data)
 
     if byte_size(data) <= @max_quic_packet_size do

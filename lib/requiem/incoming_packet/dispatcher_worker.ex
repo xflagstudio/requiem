@@ -166,8 +166,6 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   end
 
   defp handle_init_packet(address, packet, scid, dcid, token, version, state) do
-    trace("@init", dcid, scid, "", state)
-
     case Requiem.ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
       {:ok, pid} ->
         Requiem.Connection.process_packet(pid, address, packet)
