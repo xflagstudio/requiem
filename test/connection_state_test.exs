@@ -15,18 +15,35 @@ defmodule RequiemTest.ConnectionStateTest do
 
     {id1, state1} = ConnectionState.create_new_stream_id(state, :bidi)
     assert StreamId.is_server_initiated?(id1)
+    assert !StreamId.is_client_initiated?(id1)
     assert StreamId.is_bidi?(id1)
     assert !StreamId.is_uni?(id1)
+    assert StreamId.is_writable?(id1)
+    assert StreamId.is_readable?(id1)
 
     {id2, state2} = ConnectionState.create_new_stream_id(state1, :bidi)
     assert StreamId.is_server_initiated?(id2)
+    assert !StreamId.is_client_initiated?(id2)
     assert StreamId.is_bidi?(id2)
     assert !StreamId.is_uni?(id2)
+    assert StreamId.is_writable?(id2)
+    assert StreamId.is_readable?(id2)
 
     {id3, state3} = ConnectionState.create_new_stream_id(state2, :uni)
     assert StreamId.is_server_initiated?(id3)
+    assert !StreamId.is_client_initiated?(id3)
     assert !StreamId.is_bidi?(id3)
     assert StreamId.is_uni?(id3)
+    assert StreamId.is_writable?(id3)
+    assert !StreamId.is_readable?(id3)
+
+    id4 = 2
+    assert !StreamId.is_server_initiated?(id4)
+    assert StreamId.is_client_initiated?(id4)
+    assert !StreamId.is_bidi?(id4)
+    assert StreamId.is_uni?(id4)
+    assert !StreamId.is_writable?(id4)
+    assert StreamId.is_readable?(id4)
 
     assert state3.stream_id_pod == 3
   end
