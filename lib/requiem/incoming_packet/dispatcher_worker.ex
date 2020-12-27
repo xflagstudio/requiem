@@ -197,9 +197,9 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   defp trace(message, dcid, scid, odcid, %__MODULE__{trace: true}) do
     Logger.debug(
-      "<Requiem.IncomingPacket.DispatcherWorker> #{message} <dcid:#{Base.encode16(dcid)}, scid: #{
-        Base.encode16(scid)
-      }, odcid: #{Base.encode16(odcid)}>"
+      "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> #{message} <dcid:#{
+        Base.encode16(dcid)
+      }, scid: #{Base.encode16(scid)}, odcid: #{Base.encode16(odcid)}>"
     )
   end
 

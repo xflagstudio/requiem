@@ -139,7 +139,7 @@ defmodule Requiem.Connection do
             {:noreply, state}
 
           other ->
-            Logger.warn(
+            Logger.error(
               "<Requiem.Connection:#{self()}> handle_call returned unknown pattern: #{
                 inspect(other)
               }"
@@ -208,7 +208,7 @@ defmodule Requiem.Connection do
             {:noreply, state}
 
           other ->
-            Logger.warn(
+            Logger.error(
               "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{
                 inspect(other)
               }"
@@ -334,7 +334,7 @@ defmodule Requiem.Connection do
             {:noreply, state}
 
           other ->
-            Logger.warn(
+            Logger.error(
               "<Requiem.Connection:#{self()}> handle_stream returned unknown pattern: #{
                 inspect(other)
               }"
@@ -380,7 +380,7 @@ defmodule Requiem.Connection do
             {:noreply, state}
 
           other ->
-            Logger.warn(
+            Logger.error(
               "<Requiem.Connection:#{self()}> handle_dgram returned unknown pattern: #{
                 inspect(other)
               }"
@@ -539,7 +539,7 @@ defmodule Requiem.Connection do
         {:noreply, state}
 
       other ->
-        Logger.warn(
+        Logger.error(
           "<Requiem.Connection:#{self()}> handle_info returned unknown pattern: #{inspect(other)}"
         )
 
@@ -599,7 +599,7 @@ defmodule Requiem.Connection do
             {:noreply, %{state | handler_initialized: true}}
 
           other ->
-            Logger.warn(
+            Logger.error(
               "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{
                 inspect(other)
               }"
