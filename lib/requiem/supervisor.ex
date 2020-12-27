@@ -53,8 +53,8 @@ defmodule Requiem.Supervisor do
        [
          handler: handler,
          transport: SenderPool,
-         token_secret: handler |> Config.get!(:quic_token_secret),
-         conn_id_secret: handler |> Config.get!(:quic_connection_id_secret),
+         token_secret: handler |> Config.get!(:token_secret),
+         conn_id_secret: handler |> Config.get!(:connection_id_secret),
          pool_size: handler |> Config.get!(:dispatcher_pool_size),
          pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
          trace: trace
