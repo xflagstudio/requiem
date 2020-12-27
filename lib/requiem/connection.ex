@@ -439,7 +439,7 @@ defmodule Requiem.Connection do
 
       {:error, :system_error} ->
         trace("@stream_send: error", state)
-        #close(false, 0, :server_error)
+        # close(false, 0, :server_error)
         {:noreply, state}
     end
   end
@@ -460,7 +460,7 @@ defmodule Requiem.Connection do
 
       {:error, :system_error} ->
         trace("@dgram_send: error", state)
-        #close(false, 0, :server_error)
+        # close(false, 0, :server_error)
         {:noreply, state}
     end
   end
