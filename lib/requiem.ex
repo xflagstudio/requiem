@@ -77,11 +77,12 @@ defmodule Requiem do
 
       @spec stream_send(non_neg_integer, binary) :: no_return
       def stream_send(stream_id, data) do
-        if Requiem.StreamId.is_bidi?(stream_id) ||
-             Requiem.StreamId.is_server_initiated?(stream_id) do
+        if Requiem.StreamId.is_writable?(stream_id) do
           send(self(), {:__stream_send__, stream_id, data})
         else
-          raise "You can't send data on this stream."
+          Logger.error(
+            "<Requiem.Connection> You can't send data on this stream[stream_id: #{stream_id}]. This stream is not writable."
+          )
         end
       end
 
