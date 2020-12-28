@@ -70,7 +70,7 @@ defmodule Requiem do
       import Requiem.ConnectionState, only: [trap_exit: 2]
 
       @spec close() :: no_return
-      def close(), do: send(self(), {:__close__, true, 0, :shutdown})
+      def close(), do: send(self(), {:__close__, false, :no_error, :shutdown})
 
       @spec close(non_neg_integer, atom) :: no_return
       def close(code, reason), do: send(self(), {:__close__, true, code, reason})

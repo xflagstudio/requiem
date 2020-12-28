@@ -101,7 +101,7 @@ defmodule Requiem.Connection do
 
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:reply, :ok, state}
       end,
       fn ->
@@ -145,7 +145,7 @@ defmodule Requiem.Connection do
               }"
             )
 
-            close(false, 0, :server_error)
+            close(false, :internal_error, :server_error)
             {:reply, :ok, state}
         end
       end
@@ -169,11 +169,11 @@ defmodule Requiem.Connection do
         {:noreply, state}
 
       {:error, :already_closed} ->
-        close(false, 0, :shutdown)
+        close(false, :no_error, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
     end
   end
@@ -183,7 +183,7 @@ defmodule Requiem.Connection do
 
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -214,7 +214,7 @@ defmodule Requiem.Connection do
               }"
             )
 
-            close(false, 0, :server_error)
+            close(false, :internal_error, :server_error)
             {:noreply, state}
         end
       end
@@ -267,12 +267,12 @@ defmodule Requiem.Connection do
 
       {:error, :already_closed} ->
         trace("@timeout: already closed", state)
-        close(false, 0, :shutdown)
+        close(false, :no_error, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
         trace("@timeout: error", state)
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
     end
   end
@@ -289,7 +289,7 @@ defmodule Requiem.Connection do
 
       :error ->
         # invalid client indication
-        close(false, 0, :shutdown)
+        close(false, :protocol_violation, :shutdown)
         {:noreply, state}
     end
   end
@@ -308,7 +308,7 @@ defmodule Requiem.Connection do
 
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -340,7 +340,7 @@ defmodule Requiem.Connection do
               }"
             )
 
-            close(false, 0, :server_error)
+            close(false, :internal_error, :server_error)
             {:noreply, state}
         end
       end
@@ -355,7 +355,7 @@ defmodule Requiem.Connection do
   def handle_info({:__dgram_recv__, data}, %{handler_initialized: true} = state) do
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -386,7 +386,7 @@ defmodule Requiem.Connection do
               }"
             )
 
-            close(false, 0, :server_error)
+            close(false, :internal_error, :server_error)
             {:noreply, state}
         end
       end
@@ -434,7 +434,7 @@ defmodule Requiem.Connection do
 
       {:error, :already_closed} ->
         trace("@stream_send: already closed", state)
-        close(false, 0, :shutdown)
+        close(false, :no_error, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
@@ -455,7 +455,7 @@ defmodule Requiem.Connection do
 
       {:error, :already_closed} ->
         trace("@dgram_send: already closed", state)
-        close(false, 0, :shutdown)
+        close(false, :no_error, :shutdown)
         {:noreply, state}
 
       {:error, :system_error} ->
@@ -484,7 +484,7 @@ defmodule Requiem.Connection do
   def handle_info({:EXIT, pid, reason}, state) do
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -504,7 +504,7 @@ defmodule Requiem.Connection do
   def handle_info(request, %{handler_initialized: true} = state) do
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -543,7 +543,7 @@ defmodule Requiem.Connection do
           "<Requiem.Connection:#{self()}> handle_info returned unknown pattern: #{inspect(other)}"
         )
 
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
     end
   end
@@ -551,7 +551,7 @@ defmodule Requiem.Connection do
   defp handler_init(conn, client, state) do
     ExceptionGuard.guard(
       fn ->
-        close(false, 0, :server_error)
+        close(false, :internal_error, :server_error)
         {:noreply, state}
       end,
       fn ->
@@ -605,7 +605,7 @@ defmodule Requiem.Connection do
               }"
             )
 
-            close(false, 0, :server_error)
+            close(false, :internal_error, :server_error)
             {:noreply, %{state | handler_initialized: true}}
         end
       end
@@ -666,8 +666,11 @@ defmodule Requiem.Connection do
     end
   end
 
-  @spec close(boolean, non_neg_integer, atom) :: no_return
-  defp close(app, err, reason) do
+  defp close(app, err, reason) when is_atom(err) do
+    close(app, Requiem.QUIC.ErrorCode.to_integer(err), reason)
+  end
+
+  defp close(app, err, reason) when is_integer(err) do
     send(self(), {:__close__, app, err, reason})
   end
 
