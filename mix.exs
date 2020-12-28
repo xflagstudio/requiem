@@ -6,6 +6,7 @@ defmodule Requiem.MixProject do
       app: :requiem,
       version: "0.1.0",
       elixir: "~> 1.11",
+      package: package(),
       compilers: [:rustler] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       rustler_crates: rustler_crates(),
@@ -44,4 +45,17 @@ defmodule Requiem.MixProject do
       {:rustler, "~> 0.22.0-rc.0"}
     ]
   end
+
+  defp package() do
+    [
+      description: "A QuicTransport server framework.",
+      licenses: ["MIT"],
+      links: %{
+        "Github" => "https://github.com/xflagstudio/requiem",
+        "Docs" => "https://hexdocs.pm/requiem/Requiem.html"
+      },
+      maintainers: ["Lyo Kato"]
+    ]
+  end
+
 end
