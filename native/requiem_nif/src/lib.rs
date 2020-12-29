@@ -2,11 +2,16 @@ use rustler::{Atom, Env, NifResult, ResourceArc, Term};
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{LocalPid, Encoder};
+use rustler::env::OwnedEnv;
 
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
+use mio::{Events, Interest, Poll, Token};
+use mio::net::UdpSocket;
+
 use std::str;
+use std::thread;
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
 use std::sync::Mutex;
@@ -18,8 +23,35 @@ type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
 type SyncConfig = Mutex<quiche::Config>;
 type SyncConfigTable = RwLock<HashMap<Vec<u8>, SyncConfig>>;
 
-static CONFIGS: Lazy<SyncConfigTable> = Lazy::new(|| RwLock::new(HashMap::new()));
+struct SocketWrapper {
+    sock: UdpSocket,
+    poll: Poll,
+    closing: bool,
+}
+
+impl SocketWrapper {
+    pub fn new(sock: UdpSocket, poll: Poll) -> Self {
+        SocketWrapper {
+            sock:    sock,
+            poll:    poll,
+            closing: false,
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.closing = true
+    }
+
+    pub fn is_closing(&self) -> bool {
+        self.closing
+    }
+}
+
+type SocketTable = RwLock<HashMap<Vec<u8>, Mutex<SocketWrapper>>>;
+
+static CONFIGS: Lazy<SyncConfigTable>   = Lazy::new(|| RwLock::new(HashMap::new()));
 static BUFFERS: Lazy<GlobalBufferTable> = Lazy::new(|| RwLock::new(HashMap::new()));
+static SOCKETS: Lazy<SocketTable>       = Lazy::new(|| RwLock::new(HashMap::new()));
 
 struct ConnectionWrapper {
     conn: Mutex<Pin<Box<quiche::Connection>>>,
@@ -44,6 +76,7 @@ mod atoms {
         bad_format,
         not_found,
         __drain__,
+        __packet__,
         __stream_recv__,
         __dgram_recv__,
         initial, // packet type
@@ -693,6 +726,112 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 
 }
 
+#[rustler::nif]
+fn server_start(pids: Vec<LocalPid>, module: Binary, address: Binary) -> NifResult<Atom> {
+
+    let module = module.to_owned().unwrap().as_slice();
+    let address = str::from_utf8(address.as_slice()).unwrap();
+    let address = address.parse().unwrap();
+
+    let poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(1024);
+    let mut sock = UdpSocket::bind(address).unwrap();
+
+    poll.registry().register(
+        &mut sock,
+        Token(0),
+        Interest::READABLE,
+    ).unwrap();
+
+    let socket_table = &mut *SOCKETS.write();
+    if !socket_table.contains_key(module) {
+        socket_table.insert(module.to_vec(), Mutex::new(SocketWrapper::new(sock, poll)));
+    }
+
+    let oenv = OwnedEnv::new();
+
+    thread::spawn(move || {
+
+        oenv.run(|env| {
+
+        let mut buf = [0; 65535];
+
+        'poll: loop {
+
+            let socket_table = &mut *SOCKETS.write();
+            if let Some(socket) = socket_table.get_mut(module) {
+
+                let mut s = socket.lock().unwrap();
+
+                if s.is_closing() {
+                    break 'poll;
+                }
+
+               s.poll.poll(&mut events, None).unwrap();
+
+                'read: loop {
+
+                    let (len, _from) = match s.sock.recv_from(&mut buf) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            if e.kind() == std::io::ErrorKind::WouldBlock {
+                                break 'read;
+                            }
+                            // TODO send error message to process
+                            break 'poll;
+                        }
+                    };
+
+                    if len > 1350 {
+                        // too big packet. ignore
+                        break 'read;
+                    }
+
+                    // TODO convert address
+
+                    let mut packet = OwnedBinary::new(len).unwrap();
+                    packet.as_mut_slice().copy_from_slice(&buf[..len]);
+
+                    let target_pid = &pids[0];
+
+                    env.send(&target_pid, make_tuple(env, &[
+                       atoms::__packet__().to_term(env),
+                       packet.release(env).to_term(env),
+                    ]));
+                }
+
+            } else {
+                break 'poll;
+            }
+        }
+
+        });
+
+    });
+
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+fn server_stop(module: Binary) -> NifResult<Atom> {
+
+    let module = module.as_slice();
+    let socket_table = &mut *SOCKETS.write();
+
+    if let Some(socket) = socket_table.get_mut(module) {
+
+        let mut s = socket.lock().unwrap();
+        s.close();
+
+        Ok(atoms::ok())
+
+    } else {
+
+        Err(error_term(atoms::not_found()))
+
+    }
+}
+
 rustler::init!(
     "Elixir.Requiem.QUIC.NIF",
     [
@@ -731,6 +870,9 @@ rustler::init!(
         connection_on_timeout,
         connection_stream_send,
         connection_dgram_send,
+
+        server_start,
+        server_stop,
     ],
     load = load
 );
