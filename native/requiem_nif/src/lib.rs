@@ -11,6 +11,7 @@ use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
 
 use std::str;
+use std::net::SocketAddr;
 use std::thread;
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
@@ -22,6 +23,18 @@ type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
 
 type SyncConfig = Mutex<quiche::Config>;
 type SyncConfigTable = RwLock<HashMap<Vec<u8>, SyncConfig>>;
+
+struct AddressWrapper {
+    addr: SocketAddr,
+}
+
+impl AddressWrapper {
+    pub fn new(addr: SocketAddr) -> Self {
+        AddressWrapper {
+            addr: addr,
+        }
+    }
+}
 
 struct SocketWrapper {
     sock: UdpSocket,
@@ -727,7 +740,7 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 }
 
 #[rustler::nif]
-fn server_start(pids: Vec<LocalPid>, module: Binary, address: Binary) -> NifResult<Atom> {
+fn server_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
 
     let module = module.to_owned().unwrap().as_slice();
     let address = str::from_utf8(address.as_slice()).unwrap();
@@ -754,62 +767,87 @@ fn server_start(pids: Vec<LocalPid>, module: Binary, address: Binary) -> NifResu
 
         oenv.run(|env| {
 
-        let mut buf = [0; 65535];
+            let mut buf = [0; 65535];
 
-        'poll: loop {
+            'poll: loop {
 
-            let socket_table = &mut *SOCKETS.write();
-            if let Some(socket) = socket_table.get_mut(module) {
+                let socket_table = &mut *SOCKETS.write();
+                if let Some(socket) = socket_table.get_mut(module) {
 
-                let mut s = socket.lock().unwrap();
+                    let mut s = socket.lock().unwrap();
 
-                if s.is_closing() {
-                    break 'poll;
-                }
-
-               s.poll.poll(&mut events, None).unwrap();
-
-                'read: loop {
-
-                    let (len, _from) = match s.sock.recv_from(&mut buf) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            if e.kind() == std::io::ErrorKind::WouldBlock {
-                                break 'read;
-                            }
-                            // TODO send error message to process
-                            break 'poll;
-                        }
-                    };
-
-                    if len > 1350 {
-                        // too big packet. ignore
-                        break 'read;
+                    if s.is_closing() {
+                        break 'poll;
                     }
 
-                    // TODO convert address
+                   s.poll.poll(&mut events, None).unwrap();
 
-                    let mut packet = OwnedBinary::new(len).unwrap();
-                    packet.as_mut_slice().copy_from_slice(&buf[..len]);
+                    'read: loop {
 
-                    let target_pid = &pids[0];
+                        let (len, peer) = match s.sock.recv_from(&mut buf) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                if e.kind() == std::io::ErrorKind::WouldBlock {
+                                    break 'read;
+                                }
+                                // TODO send error message to process
+                                break 'poll;
+                            }
+                        };
 
-                    env.send(&target_pid, make_tuple(env, &[
-                       atoms::__packet__().to_term(env),
-                       packet.release(env).to_term(env),
-                    ]));
+                        if len > 1350 {
+                            // too big packet. ignore
+                            break 'read;
+                        }
+
+                        // TODO convert address
+                        let mut packet = OwnedBinary::new(len).unwrap();
+                        packet.as_mut_slice().copy_from_slice(&buf[..len]);
+
+                        let target_pid = &pids[0];
+
+                        env.send(&target_pid, make_tuple(env, &[
+                           atoms::__packet__().to_term(env),
+                           ResourceArc::new(AddressWrapper::new(peer)).encode(env),
+                           packet.release(env).to_term(env),
+                        ]));
+                    }
+
+                } else {
+                    break 'poll;
                 }
-
-            } else {
-                break 'poll;
             }
-        }
 
         });
 
     });
 
     Ok(atoms::ok())
+}
+
+#[rustler::nif]
+fn server_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>) -> NifResult<Atom> {
+
+    let module = module.as_slice();
+    let socket_table = &mut *SOCKETS.write();
+    let packet = packet.as_slice();
+
+    if let Some(socket) = socket_table.get_mut(module) {
+
+        let s = socket.lock().unwrap();
+        if let Err(e) = s.sock.send_to(&packet, addr.addr) {
+            if e.kind() != std::io::ErrorKind::WouldBlock {
+                panic!("send() failed: {:?}", e)
+            }
+        }
+
+        Ok(atoms::ok())
+
+    } else {
+
+        Err(error_term(atoms::not_found()))
+
+    }
 }
 
 #[rustler::nif]
@@ -872,6 +910,7 @@ rustler::init!(
         connection_dgram_send,
 
         server_start,
+        server_send,
         server_stop,
     ],
     load = load
@@ -879,6 +918,7 @@ rustler::init!(
 
 fn load(env: Env, _: Term) -> bool {
     rustler::resource!(ConnectionWrapper, env);
+    rustler::resource!(AddressWrapper, env);
     true
 }
 

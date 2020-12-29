@@ -127,5 +127,17 @@ defmodule Requiem.QUIC.NIF do
           {:ok, binary} | {:error, :system_error}
   def packet_build_retry(_module, _scid, _dcid, _new_scid, _token, _version), do: error()
 
+  @spec server_start(binary, list, binary) ::
+          :ok | {:error, :system_error}
+  def server_start(_module, _pids, _address), do: error()
+
+  @spec server_send(binary, binary, term) ::
+          :ok | {:error, :system_error | :not_found}
+  def server_send(_module, _packet, _addr), do: error()
+
+  @spec server_stop(binary) ::
+          :ok | {:error, :system_error | :not_found}
+  def server_stop(_module), do: error()
+
   defp error(), do: :erlang.nif_error(:nif_not_loaded)
 end
