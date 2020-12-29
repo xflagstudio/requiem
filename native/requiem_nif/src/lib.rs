@@ -11,7 +11,7 @@ use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
 
 use std::str;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, IpAddr};
 use std::thread;
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
@@ -740,7 +740,7 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 }
 
 #[rustler::nif]
-fn server_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
+fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
 
     let module = module.to_owned().unwrap().as_slice();
     let address = str::from_utf8(address.as_slice()).unwrap();
@@ -826,7 +826,7 @@ fn server_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
 }
 
 #[rustler::nif]
-fn server_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>) -> NifResult<Atom> {
+fn socket_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>) -> NifResult<Atom> {
 
     let module = module.as_slice();
     let socket_table = &mut *SOCKETS.write();
@@ -851,7 +851,7 @@ fn server_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>
 }
 
 #[rustler::nif]
-fn server_stop(module: Binary) -> NifResult<Atom> {
+fn socket_stop(module: Binary) -> NifResult<Atom> {
 
     let module = module.as_slice();
     let socket_table = &mut *SOCKETS.write();
@@ -868,6 +868,21 @@ fn server_stop(module: Binary) -> NifResult<Atom> {
         Err(error_term(atoms::not_found()))
 
     }
+}
+
+#[rustler::nif]
+fn socket_address_parts(env: Env, addr: ResourceArc<AddressWrapper>)
+    -> NifResult<(Binary, u16)> {
+
+    let ip_bytes = match addr.addr.ip() {
+        IpAddr::V4(ip) => ip.octets().to_vec(),
+        IpAddr::V6(ip) => ip.octets().to_vec(),
+    };
+
+    let mut ip = OwnedBinary::new(ip_bytes.len()).unwrap();
+    ip.as_mut_slice().copy_from_slice(&ip_bytes);
+
+    Ok((ip.release(env), addr.addr.port()))
 }
 
 rustler::init!(
@@ -909,9 +924,10 @@ rustler::init!(
         connection_stream_send,
         connection_dgram_send,
 
-        server_start,
-        server_send,
-        server_stop,
+        socket_start,
+        socket_send,
+        socket_stop,
+        socket_address_parts,
     ],
     load = load
 );
