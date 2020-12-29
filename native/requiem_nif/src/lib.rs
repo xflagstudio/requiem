@@ -109,7 +109,7 @@ fn set_config<F>(module: Binary, setter: F) -> NifResult<Atom>
     where F: FnOnce(&mut quiche::Config) -> quiche::Result<()> {
 
     let module = module.as_slice();
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if let Some(config) = config_table.get_mut(module) {
 
@@ -167,7 +167,7 @@ fn quic_init(module: Binary) -> NifResult<Atom> {
 
 fn config_init(module: &[u8]) -> NifResult<Atom> {
 
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if config_table.contains_key(module) {
 
@@ -189,7 +189,7 @@ fn config_init(module: &[u8]) -> NifResult<Atom> {
 }
 
 fn buffer_init(module: &[u8]) {
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
     if !buffer_table.contains_key(module) {
         buffer_table.insert(module.to_vec(), Mutex::new([0; 1350]));
     }
@@ -371,7 +371,7 @@ fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
     let scid   = scid.as_slice();
     let odcid  = odcid.as_slice();
 
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if let Some(config) = config_table.get_mut(module) {
 
@@ -675,7 +675,7 @@ fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Binary
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
 
     if let Some(buffer) = buffer_table.get_mut(module) {
 
@@ -706,7 +706,7 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
 
     if let Some(buffer) = buffer_table.get_mut(module) {
 
@@ -739,16 +739,11 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 
 }
 
-#[rustler::nif]
-fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
-
-    let module = module.to_owned().unwrap().as_slice();
-    let address = str::from_utf8(address.as_slice()).unwrap();
-    let address = address.parse().unwrap();
+fn socket_create(module: &[u8], address: SocketAddr) {
+    // TODO handle 'address already in use'
+    let mut sock = UdpSocket::bind(address).unwrap();
 
     let poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(1024);
-    let mut sock = UdpSocket::bind(address).unwrap();
 
     poll.registry().register(
         &mut sock,
@@ -756,22 +751,42 @@ fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
         Interest::READABLE,
     ).unwrap();
 
-    let socket_table = &mut *SOCKETS.write();
+    let mut socket_table = SOCKETS.write();
     if !socket_table.contains_key(module) {
-        socket_table.insert(module.to_vec(), Mutex::new(SocketWrapper::new(sock, poll)));
+        socket_table.insert(
+            module.to_vec(),
+            Mutex::new(SocketWrapper::new(sock, poll)),
+        );
     }
+}
+
+#[rustler::nif]
+fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
+
+    let module = module.to_owned().unwrap().as_slice();
+    let address = str::from_utf8(address.as_slice()).unwrap();
+    let address: SocketAddr = address.parse().unwrap();
+
+    socket_create(module, address);
+
+    let mut socket_table = SOCKETS.write();
+    let _sd = socket_table.get_mut(module).unwrap();
 
     let oenv = OwnedEnv::new();
 
     thread::spawn(move || {
 
-        oenv.run(|env| {
+        let mut events = Events::with_capacity(1024);
+
+        let target_pid = &pids[0];
+
+        oenv.run(move |env| {
 
             let mut buf = [0; 65535];
 
             'poll: loop {
 
-                let socket_table = &mut *SOCKETS.write();
+                let mut socket_table = SOCKETS.write();
                 if let Some(socket) = socket_table.get_mut(module) {
 
                     let mut s = socket.lock().unwrap();
@@ -791,6 +806,10 @@ fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
                                     break 'read;
                                 }
                                 // TODO send error message to process
+                                env.send(&target_pid, make_tuple(env, &[
+                                        atoms::system_error().to_term(env),
+                                        1.encode(env),
+                                ]));
                                 break 'poll;
                             }
                         };
@@ -804,7 +823,7 @@ fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
                         let mut packet = OwnedBinary::new(len).unwrap();
                         packet.as_mut_slice().copy_from_slice(&buf[..len]);
 
-                        let target_pid = &pids[0];
+                        //let target_pid = &pids[0];
 
                         env.send(&target_pid, make_tuple(env, &[
                            atoms::__packet__().to_term(env),
@@ -814,14 +833,16 @@ fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
                     }
 
                 } else {
+                    env.send(&target_pid, make_tuple(env, &[
+                            atoms::system_error().to_term(env),
+                            2.encode(env),
+                    ]));
                     break 'poll;
                 }
             }
 
         });
-
     });
-
     Ok(atoms::ok())
 }
 
@@ -829,9 +850,9 @@ fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResu
 fn socket_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>) -> NifResult<Atom> {
 
     let module = module.as_slice();
-    let socket_table = &mut *SOCKETS.write();
     let packet = packet.as_slice();
 
+    let mut socket_table = SOCKETS.write();
     if let Some(socket) = socket_table.get_mut(module) {
 
         let s = socket.lock().unwrap();
@@ -854,8 +875,8 @@ fn socket_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>
 fn socket_stop(module: Binary) -> NifResult<Atom> {
 
     let module = module.as_slice();
-    let socket_table = &mut *SOCKETS.write();
 
+    let mut socket_table = SOCKETS.write();
     if let Some(socket) = socket_table.get_mut(module) {
 
         let mut s = socket.lock().unwrap();

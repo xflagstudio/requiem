@@ -41,6 +41,7 @@ defmodule Requiem.Transport.RustUDPSocket do
       state.port
     ) do
       :ok ->
+        Logger.debug("<Requiem.Transport.RustUDPSocket> opened")
         Process.flag(:trap_exit, true)
         {:ok, state}
 
@@ -95,6 +96,10 @@ defmodule Requiem.Transport.RustUDPSocket do
     end
 
     state.dispatcher.dispatch(state.handler, address, data)
+    {:noreply, state}
+  end
+  def handle_info({:system_error, pos}, state) do
+    Logger.debug("<Requiem.Transport.RustUDPSocket> rust error: pos-#{pos}")
     {:noreply, state}
   end
 
