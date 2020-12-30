@@ -1,7 +1,7 @@
 defmodule RequiemTest.ConnectionIDTest do
   use ExUnit.Case, async: true
 
-  alias Requiem.QUIC.ConnectionID
+  alias Requiem.ConnectionID
 
   test "connection id" do
     key = :crypto.strong_rand_bytes(32)

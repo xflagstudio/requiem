@@ -1,4 +1,4 @@
-defmodule Requiem.QUIC.RetryToken do
+defmodule Requiem.RetryToken do
   alias Requiem.Address
 
   defmodule Params do

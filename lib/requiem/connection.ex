@@ -667,7 +667,7 @@ defmodule Requiem.Connection do
   end
 
   defp close(app, err, reason) when is_atom(err) do
-    close(app, Requiem.QUIC.ErrorCode.to_integer(err), reason)
+    close(app, Requiem.ErrorCode.to_integer(err), reason)
   end
 
   defp close(app, err, reason) when is_integer(err) do

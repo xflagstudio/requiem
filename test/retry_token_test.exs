@@ -2,9 +2,9 @@ defmodule RequiemTest.RetryTokenTest do
   use ExUnit.Case, async: true
 
   alias Requiem.Address
-  alias Requiem.QUIC.RetryToken
-  alias Requiem.QUIC.RetryToken.Protector
-  alias Requiem.QUIC.RetryToken.Params
+  alias Requiem.RetryToken
+  alias Requiem.RetryToken.Protector
+  alias Requiem.RetryToken.Params
 
   test "token protector" do
     origin = "HOGEHOGE"

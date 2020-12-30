@@ -1,7 +1,7 @@
 defmodule RequiemTest.ErrorCodeTest do
   use ExUnit.Case, async: true
 
-  alias Requiem.QUIC.ErrorCode
+  alias Requiem.ErrorCode
 
   test "error_code" do
     assert ErrorCode.to_integer(:no_error) == 0

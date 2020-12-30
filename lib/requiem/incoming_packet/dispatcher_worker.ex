@@ -118,9 +118,9 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   defp handle_token_missing_packet(address, scid, dcid, version, state) do
     with {:ok, new_id} <-
-           Requiem.QUIC.ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
+           Requiem.ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
          {:ok, token} <-
-           Requiem.QUIC.RetryToken.create(address, dcid, new_id, state.token_secret),
+           Requiem.RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
            Requiem.QUIC.Packet.build_retry(state.handler, scid, dcid, new_id, token, version) do
       state.transport.send(state.handler, address, resp)
@@ -135,7 +135,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
        when byte_size(dcid) == 20 do
     trace("@validate", dcid, scid, "", state)
 
-    case Requiem.QUIC.RetryToken.validate(address, state.token_secret, token) do
+    case Requiem.RetryToken.validate(address, state.token_secret, token) do
       {:ok, odcid, _retry_scid} ->
         trace("@validate: success", dcid, scid, odcid, state)
 
