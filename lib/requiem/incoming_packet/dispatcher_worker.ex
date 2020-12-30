@@ -135,8 +135,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
        when byte_size(dcid) == 20 do
     trace("@validate", dcid, scid, "", state)
 
-    case Requiem.RetryToken.validate(address, state.token_secret, token) do
-      {:ok, odcid, _retry_scid} ->
+    case Requiem.RetryToken.validate(address, dcid, state.token_secret, token) do
+      {:ok, odcid} ->
         trace("@validate: success", dcid, scid, odcid, state)
 
         case create_connection_if_needed(

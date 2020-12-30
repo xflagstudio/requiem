@@ -102,16 +102,16 @@ defmodule Requiem.RetryToken do
     end
   end
 
-  @spec validate(Address.t(), binary, binary) :: {:ok, binary, binary} | :error
-  def validate(addr, secret, token) do
+  @spec validate(Address.t(), binary, binary, binary) :: {:ok, binary, binary} | :error
+  def validate(addr, dcid, secret, token) do
     case token do
       <<nonce::binary-size(16), tag::binary-size(16), rest::binary>> ->
         case Protector.decrypt(secret, nonce, tag, rest) do
           {:ok, plain} ->
             case Params.parse(plain) do
               {:ok, odcid, retry_scid, addr2} ->
-                if Address.same?(addr, addr2) do
-                  {:ok, odcid, retry_scid}
+                if Address.same?(addr, addr2) && retry_scid == dcid do
+                  {:ok, odcid}
                 else
                   :error
                 end
