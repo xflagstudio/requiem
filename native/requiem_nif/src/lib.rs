@@ -2,7 +2,7 @@ use rustler::{Atom, Env, NifResult, ResourceArc, Term};
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{LocalPid, Encoder};
-use rustler::env::OwnedEnv;
+use rustler::env::{OwnedEnv};
 
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -12,11 +12,33 @@ use mio::net::UdpSocket;
 
 use std::str;
 use std::net::{SocketAddr, IpAddr};
-use std::thread;
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
 use std::sync::Mutex;
 use std::collections::HashMap;
+
+mod atoms {
+    rustler::atoms! {
+        ok,
+        system_error,
+        socket_error,
+        cant_receive,
+        already_exists,
+        already_closed,
+        bad_format,
+        not_found,
+        __drain__,
+        __packet__,
+        __stream_recv__,
+        __dgram_recv__,
+        initial,             // packet type
+        handshake,           // packet type
+        retry,               // packet type
+        zero_rtt,            // packet type
+        version_negotiation, // packet type
+        short                // packet type
+    }
+}
 
 type GlobalBuffer = Mutex<[u8; 1350]>;
 type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
@@ -37,34 +59,114 @@ impl AddressWrapper {
 }
 
 struct SocketWrapper {
-    sock: UdpSocket,
-    poll: Poll,
-    closing: bool,
+    sock:   UdpSocket,
+    poll:   Poll,
+    events: Events,
+    buf:    [u8; 65535],
 }
 
 impl SocketWrapper {
-    pub fn new(sock: UdpSocket, poll: Poll) -> Self {
+
+    pub fn new(address: SocketAddr, capacity: usize) -> Self {
+
+        let buf = [0; 65535];
+        let mut sock = UdpSocket::bind(address).unwrap();
+
+        let poll = Poll::new().unwrap();
+
+        poll.registry().register(
+            &mut sock,
+            Token(0),
+            Interest::READABLE,
+        ).unwrap();
+
+        let events = Events::with_capacity(capacity);
+
         SocketWrapper {
-            sock:    sock,
-            poll:    poll,
-            closing: false,
+            sock:   sock,
+            poll:   poll,
+            events: events,
+            buf:    buf,
         }
     }
 
-    pub fn close(&mut self) {
-        self.closing = true
+    pub fn poll(&mut self, env: &Env, pid: &LocalPid) {
+
+        self.poll.poll(&mut self.events, None).unwrap();
+
+        for event in self.events.iter() {
+            match event.token() {
+                Token(0) => {
+                    let (len, peer) = match self.sock.recv_from(&mut self.buf) {
+                        Ok(v) => v,
+                        Err(_e) => {
+                            /*
+                            if e.kind() != std::io::ErrorKind::WouldBlock {
+                                env.send(pid, make_tuple(*env, &[
+                                        atoms::socket_error().to_term(*env),
+                                        atoms::cant_receive().to_term(*env),
+                                ]));
+                                break;
+                            }
+                            */
+                            continue;
+                        }
+                    };
+                    if len > 1350 {
+                        // too big packet. ignore
+                        continue;
+                    }
+
+                    let mut packet = OwnedBinary::new(len).unwrap();
+                    packet.as_mut_slice().copy_from_slice(&self.buf[..len]);
+
+                    env.send(pid, make_tuple(*env, &[
+                            atoms::__packet__().to_term(*env),
+                            ResourceArc::new(AddressWrapper::new(peer)).encode(*env),
+                            packet.release(*env).to_term(*env),
+                    ]));
+                },
+                _ => {
+                    continue;
+                }
+            }
+        }
     }
 
-    pub fn is_closing(&self) -> bool {
-        self.closing
+    pub fn send(&self, address: &SocketAddr, packet: &[u8]) -> bool {
+        if let Err(_) = self.sock.send_to(packet, *address) {
+            return false
+        } else {
+            return true
+        }
     }
 }
 
-type SocketTable = RwLock<HashMap<Vec<u8>, Mutex<SocketWrapper>>>;
+struct LockedSocketWrapper {
+    sock: Mutex<SocketWrapper>,
+}
+
+impl LockedSocketWrapper {
+
+    pub fn new(address: SocketAddr, capacity: usize) -> Self {
+        LockedSocketWrapper {
+            sock: Mutex::new(SocketWrapper::new(address, capacity)),
+        }
+    }
+
+    pub fn poll(&self, env: &Env, pid: &LocalPid) {
+        let mut raw = self.sock.lock().unwrap();
+        raw.poll(env, pid);
+    }
+
+    pub fn send(&self, address: &SocketAddr, packet: &[u8]) {
+        let raw = self.sock.lock().unwrap();
+        raw.send(address, packet);
+    }
+}
 
 static CONFIGS: Lazy<SyncConfigTable>   = Lazy::new(|| RwLock::new(HashMap::new()));
 static BUFFERS: Lazy<GlobalBufferTable> = Lazy::new(|| RwLock::new(HashMap::new()));
-static SOCKETS: Lazy<SocketTable>       = Lazy::new(|| RwLock::new(HashMap::new()));
 
 struct ConnectionWrapper {
     conn: Mutex<Pin<Box<quiche::Connection>>>,
@@ -72,32 +174,12 @@ struct ConnectionWrapper {
 }
 
 impl ConnectionWrapper {
+
     pub fn new(conn: Pin<Box<quiche::Connection>>) -> Self {
         ConnectionWrapper {
             conn: Mutex::new(conn),
             buf: Mutex::new([0; 1350]),
         }
-    }
-}
-
-mod atoms {
-    rustler::atoms! {
-        ok,
-        system_error,
-        already_exists,
-        already_closed,
-        bad_format,
-        not_found,
-        __drain__,
-        __packet__,
-        __stream_recv__,
-        __dgram_recv__,
-        initial, // packet type
-        handshake, // packet type
-        retry, // packet type
-        zero_rtt, // packet type
-        version_negotiation, // packet type
-        short // packet type
     }
 }
 
@@ -739,163 +821,41 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 
 }
 
-fn socket_create(module: &[u8], address: SocketAddr) {
-    // TODO handle 'address already in use'
-    let mut sock = UdpSocket::bind(address).unwrap();
-
-    let poll = Poll::new().unwrap();
-
-    poll.registry().register(
-        &mut sock,
-        Token(0),
-        Interest::READABLE,
-    ).unwrap();
-
-    let mut socket_table = SOCKETS.write();
-    if !socket_table.contains_key(module) {
-        socket_table.insert(
-            module.to_vec(),
-            Mutex::new(SocketWrapper::new(sock, poll)),
-        );
-    }
-}
-
 #[rustler::nif]
-fn socket_start(module: Binary, pids: Vec<LocalPid>, address: Binary) -> NifResult<Atom> {
+fn socket_open(address: Binary, pid: LocalPid) -> NifResult<(Atom, ResourceArc<LockedSocketWrapper>)> {
 
-    let module = module.to_owned().unwrap().as_slice();
     let address = str::from_utf8(address.as_slice()).unwrap();
     let address: SocketAddr = address.parse().unwrap();
 
-    socket_create(module, address);
-
-    let mut socket_table = SOCKETS.write();
-    let _sd = socket_table.get_mut(module).unwrap();
+    let sock = ResourceArc::new(LockedSocketWrapper::new(address, 1024));
+    let sock2 = sock.clone();
 
     let oenv = OwnedEnv::new();
-
-    thread::spawn(move || {
-
-        let mut events = Events::with_capacity(1024);
-
-        let target_pid = &pids[0];
-
-        oenv.run(move |env| {
-
-            let mut buf = [0; 65535];
-
-            'poll: loop {
-
-                let mut socket_table = SOCKETS.write();
-                if let Some(socket) = socket_table.get_mut(module) {
-
-                    let mut s = socket.lock().unwrap();
-
-                    if s.is_closing() {
-                        break 'poll;
-                    }
-
-                   s.poll.poll(&mut events, None).unwrap();
-
-                    'read: loop {
-
-                        let (len, peer) = match s.sock.recv_from(&mut buf) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                if e.kind() == std::io::ErrorKind::WouldBlock {
-                                    break 'read;
-                                }
-                                // TODO send error message to process
-                                env.send(&target_pid, make_tuple(env, &[
-                                        atoms::system_error().to_term(env),
-                                        1.encode(env),
-                                ]));
-                                break 'poll;
-                            }
-                        };
-
-                        if len > 1350 {
-                            // too big packet. ignore
-                            break 'read;
-                        }
-
-                        // TODO convert address
-                        let mut packet = OwnedBinary::new(len).unwrap();
-                        packet.as_mut_slice().copy_from_slice(&buf[..len]);
-
-                        //let target_pid = &pids[0];
-
-                        env.send(&target_pid, make_tuple(env, &[
-                           atoms::__packet__().to_term(env),
-                           ResourceArc::new(AddressWrapper::new(peer)).encode(env),
-                           packet.release(env).to_term(env),
-                        ]));
-                    }
-
-                } else {
-                    env.send(&target_pid, make_tuple(env, &[
-                            atoms::system_error().to_term(env),
-                            2.encode(env),
-                    ]));
-                    break 'poll;
-                }
+    std::thread::spawn(move || {
+        oenv.run(|env| {
+            loop {
+                sock2.poll(&env, &pid);
+                std::thread::sleep(std::time::Duration::from_millis(1));
             }
-
-        });
+        })
     });
+
+    Ok((atoms::ok(), sock))
+}
+
+#[rustler::nif]
+fn socket_send(sock: ResourceArc<LockedSocketWrapper>, peer: ResourceArc<AddressWrapper>,
+    packet: Binary) -> NifResult<Atom> {
+    let packet = packet.as_slice();
+    sock.send(&peer.addr, packet);
     Ok(atoms::ok())
 }
 
 #[rustler::nif]
-fn socket_send(module: Binary, packet: Binary, addr: ResourceArc<AddressWrapper>) -> NifResult<Atom> {
+fn socket_address_parts(env: Env, peer: ResourceArc<AddressWrapper>)
+    -> NifResult<(Atom, Binary, u16)> {
 
-    let module = module.as_slice();
-    let packet = packet.as_slice();
-
-    let mut socket_table = SOCKETS.write();
-    if let Some(socket) = socket_table.get_mut(module) {
-
-        let s = socket.lock().unwrap();
-        if let Err(e) = s.sock.send_to(&packet, addr.addr) {
-            if e.kind() != std::io::ErrorKind::WouldBlock {
-                panic!("send() failed: {:?}", e)
-            }
-        }
-
-        Ok(atoms::ok())
-
-    } else {
-
-        Err(error_term(atoms::not_found()))
-
-    }
-}
-
-#[rustler::nif]
-fn socket_stop(module: Binary) -> NifResult<Atom> {
-
-    let module = module.as_slice();
-
-    let mut socket_table = SOCKETS.write();
-    if let Some(socket) = socket_table.get_mut(module) {
-
-        let mut s = socket.lock().unwrap();
-        s.close();
-
-        Ok(atoms::ok())
-
-    } else {
-
-        Err(error_term(atoms::not_found()))
-
-    }
-}
-
-#[rustler::nif]
-fn socket_address_parts(env: Env, addr: ResourceArc<AddressWrapper>)
-    -> NifResult<(Binary, u16)> {
-
-    let ip_bytes = match addr.addr.ip() {
+    let ip_bytes = match peer.addr.ip() {
         IpAddr::V4(ip) => ip.octets().to_vec(),
         IpAddr::V6(ip) => ip.octets().to_vec(),
     };
@@ -903,7 +863,7 @@ fn socket_address_parts(env: Env, addr: ResourceArc<AddressWrapper>)
     let mut ip = OwnedBinary::new(ip_bytes.len()).unwrap();
     ip.as_mut_slice().copy_from_slice(&ip_bytes);
 
-    Ok((ip.release(env), addr.addr.port()))
+    Ok((atoms::ok(), ip.release(env), peer.addr.port()))
 }
 
 rustler::init!(
@@ -945,9 +905,8 @@ rustler::init!(
         connection_stream_send,
         connection_dgram_send,
 
-        socket_start,
+        socket_open,
         socket_send,
-        socket_stop,
         socket_address_parts,
     ],
     load = load
@@ -956,6 +915,7 @@ rustler::init!(
 fn load(env: Env, _: Term) -> bool {
     rustler::resource!(ConnectionWrapper, env);
     rustler::resource!(AddressWrapper, env);
+    rustler::resource!(LockedSocketWrapper, env);
     true
 }
 

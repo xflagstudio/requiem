@@ -1,26 +1,15 @@
 defmodule Requiem.QUIC.Socket do
   alias Requiem.QUIC.NIF
 
-  @spec start(module, list, binary, non_neg_integer) :: :ok | {:error, :system_error}
-  def start(handler, pids, host, port) do
+  @spec open(binary, non_neg_integer, pid) :: {:ok, term} | {:error, :system_error}
+  def open(host, port, pid) do
     address = "#{host}:#{port}"
-    handler
-    |> to_string()
-    |> NIF.socket_start(pids, address)
+    NIF.socket_open(address, pid)
   end
 
-  @spec send(module, binary, term) :: :ok | {:error, :system_error | :not_found}
-  def send(handler, packet, peer) do
-    handler
-    |> to_string()
-    |> NIF.socket_send(packet, peer)
-  end
-
-  @spec stop(module) :: :ok | {:error, :system_error | :not_found}
-  def stop(handler) do
-    handler
-    |> to_string()
-    |> NIF.socket_stop()
+  @spec send(term, term, binary) :: :ok | {:error, :system_error | :not_found}
+  def send(sock, peer, packet) do
+    NIF.socket_send(sock, peer, packet)
   end
 
   @spec address_parts(term) :: {:ok, binary, non_neg_integer}

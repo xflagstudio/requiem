@@ -127,17 +127,13 @@ defmodule Requiem.QUIC.NIF do
           {:ok, binary} | {:error, :system_error}
   def packet_build_retry(_module, _scid, _dcid, _new_scid, _token, _version), do: error()
 
-  @spec socket_start(binary, list, binary) ::
-          :ok | {:error, :system_error}
-  def socket_start(_module, _pids, _address), do: error()
+  @spec socket_open(binary, pid) ::
+  {:ok, term} | {:error, :system_error}
+  def socket_open(_address, _pid), do: error()
 
-  @spec socket_send(binary, binary, term) ::
+  @spec socket_send(term, term, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def socket_send(_module, _packet, _addr), do: error()
-
-  @spec socket_stop(binary) ::
-          :ok | {:error, :system_error | :not_found}
-  def socket_stop(_module), do: error()
+  def socket_send(_sock, _addr, _packet), do: error()
 
   @spec socket_address_parts(term) ::
   {:ok, binary, non_neg_integer}
