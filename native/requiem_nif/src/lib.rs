@@ -12,6 +12,26 @@ use std::convert::{TryInto, TryFrom};
 use std::sync::Mutex;
 use std::collections::HashMap;
 
+mod atoms {
+    rustler::atoms! {
+        ok,
+        system_error,
+        already_exists,
+        already_closed,
+        bad_format,
+        not_found,
+        __drain__,
+        __stream_recv__,
+        __dgram_recv__,
+        initial, // packet type
+        handshake, // packet type
+        retry, // packet type
+        zero_rtt, // packet type
+        version_negotiation, // packet type
+        short // packet type
+    }
+}
+
 type GlobalBuffer = Mutex<[u8; 1350]>;
 type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
 
@@ -253,26 +273,6 @@ impl LockedConnection {
         LockedConnection {
             conn: Mutex::new(Connection::new(raw)),
         }
-    }
-}
-
-mod atoms {
-    rustler::atoms! {
-        ok,
-        system_error,
-        already_exists,
-        already_closed,
-        bad_format,
-        not_found,
-        __drain__,
-        __stream_recv__,
-        __dgram_recv__,
-        initial, // packet type
-        handshake, // packet type
-        retry, // packet type
-        zero_rtt, // packet type
-        version_negotiation, // packet type
-        short // packet type
     }
 }
 
@@ -621,7 +621,7 @@ fn connection_stream_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, stream_id: u64, data: Binary)
     -> NifResult<(Atom, u64)> {
 
-        let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock().unwrap();
     match conn.stream_send(&env, &pid, stream_id, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason)      => Err(error_term(reason)),
@@ -633,7 +633,7 @@ fn connection_dgram_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, data: Binary)
     -> NifResult<(Atom, u64)> {
 
-        let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock().unwrap();
     match conn.dgram_send(&env, &pid, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason)      => Err(error_term(reason)),
