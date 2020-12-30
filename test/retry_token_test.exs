@@ -2,9 +2,9 @@ defmodule RequiemTest.RetryTokenTest do
   use ExUnit.Case, async: true
 
   alias Requiem.Address
-  alias Requiem.QUIC.RetryToken
-  alias Requiem.QUIC.RetryToken.Protector
-  alias Requiem.QUIC.RetryToken.Params
+  alias Requiem.RetryToken
+  alias Requiem.RetryToken.Protector
+  alias Requiem.RetryToken.Params
 
   test "token protector" do
     origin = "HOGEHOGE"
@@ -51,8 +51,9 @@ defmodule RequiemTest.RetryTokenTest do
 
     addr1 = Address.new({192, 168, 0, 1}, 8080)
     {:ok, rt1} = RetryToken.create(addr1, odcid, scid, secret)
-    {:ok, a_odcid1, a_scid1} = RetryToken.validate(addr1, secret, rt1)
+    {:ok, a_odcid1} = RetryToken.validate(addr1, scid, secret, rt1)
     assert a_odcid1 == odcid
-    assert a_scid1 == scid
+    scid2 = :crypto.strong_rand_bytes(16)
+    assert RetryToken.validate(addr1, scid2, secret, rt1) == :error
   end
 end

@@ -1,4 +1,4 @@
-defmodule Requiem.QUIC.ErrorCode do
+defmodule Requiem.ErrorCode do
   @type error_code ::
           :no_error
           | :internal_error
