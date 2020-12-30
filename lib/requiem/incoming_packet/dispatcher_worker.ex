@@ -123,6 +123,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
            Requiem.RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
            Requiem.QUIC.Packet.build_retry(state.handler, scid, dcid, new_id, token, version) do
+      trace("@send", dcid, scid, "", state)
       state.transport.send(state.handler, address, resp)
       :ok
     else
@@ -172,8 +173,10 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
       {:error, :not_found} ->
         if token == "" do
+          trace("@token_missing_packet", dcid, scid, "", state)
           handle_token_missing_packet(address, scid, dcid, version, state)
         else
+          trace("@retry_packet", dcid, scid, "", state)
           handle_retry_packet(address, packet, scid, dcid, token, state)
         end
     end

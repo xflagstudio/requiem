@@ -4,14 +4,14 @@ defmodule RequiemEcho.Handler do
 
   @impl Requiem
   def init(conn, client) do
-    Logger.debug("<QuicHandler> init")
-    Logger.debug("<QuicHandler> origin: #{client.origin}, path: #{client.path}")
+    Logger.debug("<Handler> init")
+    Logger.debug("<Handler> origin: #{client.origin}, path: #{client.path}")
     {:ok, conn, %{}}
   end
 
   @impl Requiem
   def handle_stream(stream_id, data, conn, state) do
-    Logger.debug("<QuicHandler> handle_stream(#{stream_id}, #{data})")
+    Logger.debug("<Handler> handle_stream(#{stream_id}, #{data})")
 
     if Requiem.StreamId.is_bidi?(stream_id) do
       stream_send(stream_id, data)
@@ -25,14 +25,14 @@ defmodule RequiemEcho.Handler do
 
   @impl Requiem
   def handle_dgram(data, conn, state) do
-    Logger.debug("<QuicHandler> handle_dgram(#{data})")
+    Logger.debug("<Handler> handle_dgram(#{data})")
     dgram_send(data)
     {:ok, conn, state}
   end
 
   @impl Requiem
   def terminate(reason, _conn, _state) do
-    Logger.debug("<QuicHandler> terminate: #{inspect(reason)}")
+    Logger.debug("<Handler> terminate: #{inspect(reason)}")
     :ok
   end
 end

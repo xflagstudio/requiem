@@ -10,7 +10,9 @@ defmodule Requiem.Supervisor do
   alias Requiem.ConnectionSupervisor
   alias Requiem.OutgoingPacket.SenderPool
   alias Requiem.IncomingPacket.DispatcherPool
-  alias Requiem.Transport.GenUDP
+
+  # @transport_module Requiem.Transport.RustUDP
+  @transport_module Requiem.Transport.GenUDP
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
@@ -44,7 +46,7 @@ defmodule Requiem.Supervisor do
       {SenderPool,
        [
          handler: handler,
-         transport: GenUDP,
+         transport: @transport_module,
          buffering_interval: handler |> Config.get!(:sender_buffering_interval),
          pool_size: handler |> Config.get!(:sender_pool_size),
          pool_max_overflow: handler |> Config.get!(:sender_pool_max_overflow)
@@ -59,7 +61,7 @@ defmodule Requiem.Supervisor do
          pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
          trace: trace
        ]},
-      {GenUDP,
+      {@transport_module,
        [
          handler: handler,
          dispatcher: DispatcherPool,

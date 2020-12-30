@@ -3,16 +3,18 @@ defmodule Requiem.Address do
 
   @type t :: %__MODULE__{
           host: :inet.ip_address(),
-          port: :inet.port_number()
+          port: :inet.port_number(),
+          raw: nil | term
         }
 
-  defstruct host: nil, port: nil
+  defstruct host: nil, port: nil, raw: nil
 
-  @spec new(:inet.ip_address(), :inet.port_number()) :: t
-  def new(host, port) do
+  @spec new(:inet.ip_address(), :inet.port_number(), term | nil) :: t
+  def new(host, port, raw \\ nil) do
     %__MODULE__{
       host: host,
-      port: port
+      port: port,
+      raw: raw
     }
   end
 

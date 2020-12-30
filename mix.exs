@@ -57,5 +57,4 @@ defmodule Requiem.MixProject do
       maintainers: ["Lyo Kato"]
     ]
   end
-
 end
