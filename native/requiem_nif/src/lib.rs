@@ -63,7 +63,7 @@ fn set_config<F>(module: Binary, setter: F) -> NifResult<Atom>
     where F: FnOnce(&mut quiche::Config) -> quiche::Result<()> {
 
     let module = module.as_slice();
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if let Some(config) = config_table.get_mut(module) {
 
@@ -121,7 +121,7 @@ fn quic_init(module: Binary) -> NifResult<Atom> {
 
 fn config_init(module: &[u8]) -> NifResult<Atom> {
 
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if config_table.contains_key(module) {
 
@@ -143,7 +143,7 @@ fn config_init(module: &[u8]) -> NifResult<Atom> {
 }
 
 fn buffer_init(module: &[u8]) {
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
     if !buffer_table.contains_key(module) {
         buffer_table.insert(module.to_vec(), Mutex::new([0; 1350]));
     }
@@ -325,7 +325,7 @@ fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
     let scid   = scid.as_slice();
     let odcid  = odcid.as_slice();
 
-    let config_table = &mut *CONFIGS.write();
+    let mut config_table = CONFIGS.write();
 
     if let Some(config) = config_table.get_mut(module) {
 
@@ -629,7 +629,7 @@ fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Binary
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
 
     if let Some(buffer) = buffer_table.get_mut(module) {
 
@@ -660,7 +660,7 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = &mut *BUFFERS.write();
+    let mut buffer_table = BUFFERS.write();
 
     if let Some(buffer) = buffer_table.get_mut(module) {
 
