@@ -127,16 +127,16 @@ defmodule Requiem.QUIC.NIF do
           {:ok, binary} | {:error, :system_error}
   def packet_build_retry(_module, _scid, _dcid, _new_scid, _token, _version), do: error()
 
-  @spec socket_open(binary, pid) ::
-  {:ok, term} | {:error, :system_error}
-  def socket_open(_address, _pid), do: error()
+  @spec socket_open(binary, pid, non_neg_integer, non_neg_integer) ::
+          {:ok, term} | {:error, :system_error}
+  def socket_open(_address, _pid, _event_capacity, _poll_interval), do: error()
 
   @spec socket_send(term, term, binary) ::
           :ok | {:error, :system_error | :not_found}
   def socket_send(_sock, _addr, _packet), do: error()
 
   @spec socket_address_parts(term) ::
-  {:ok, binary, non_neg_integer}
+          {:ok, binary, non_neg_integer}
   def socket_address_parts(_address), do: error()
 
   defp error(), do: :erlang.nif_error(:nif_not_loaded)

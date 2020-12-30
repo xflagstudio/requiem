@@ -11,6 +11,8 @@ use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
 
 use std::str;
+use std::thread;
+use std::time;
 use std::net::{SocketAddr, IpAddr};
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
@@ -46,26 +48,26 @@ type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
 type SyncConfig = Mutex<quiche::Config>;
 type SyncConfigTable = RwLock<HashMap<Vec<u8>, SyncConfig>>;
 
-struct AddressWrapper {
+struct Peer {
     addr: SocketAddr,
 }
 
-impl AddressWrapper {
+impl Peer {
     pub fn new(addr: SocketAddr) -> Self {
-        AddressWrapper {
+        Peer {
             addr: addr,
         }
     }
 }
 
-struct SocketWrapper {
+struct Socket {
     sock:   UdpSocket,
     poll:   Poll,
     events: Events,
     buf:    [u8; 65535],
 }
 
-impl SocketWrapper {
+impl Socket {
 
     pub fn new(address: SocketAddr, capacity: usize) -> Self {
 
@@ -82,7 +84,7 @@ impl SocketWrapper {
 
         let events = Events::with_capacity(capacity);
 
-        SocketWrapper {
+        Socket {
             sock:   sock,
             poll:   poll,
             events: events,
@@ -122,7 +124,7 @@ impl SocketWrapper {
 
                     env.send(pid, make_tuple(*env, &[
                             atoms::__packet__().to_term(*env),
-                            ResourceArc::new(AddressWrapper::new(peer)).encode(*env),
+                            ResourceArc::new(Peer::new(peer)).encode(*env),
                             packet.release(*env).to_term(*env),
                     ]));
                 },
@@ -142,15 +144,15 @@ impl SocketWrapper {
     }
 }
 
-struct LockedSocketWrapper {
-    sock: Mutex<SocketWrapper>,
+struct LockedSocket {
+    sock: Mutex<Socket>,
 }
 
-impl LockedSocketWrapper {
+impl LockedSocket {
 
     pub fn new(address: SocketAddr, capacity: usize) -> Self {
-        LockedSocketWrapper {
-            sock: Mutex::new(SocketWrapper::new(address, capacity)),
+        LockedSocket {
+            sock: Mutex::new(Socket::new(address, capacity)),
         }
     }
 
@@ -888,20 +890,22 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
 }
 
 #[rustler::nif]
-fn socket_open(address: Binary, pid: LocalPid) -> NifResult<(Atom, ResourceArc<LockedSocketWrapper>)> {
+fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interval: u64)
+    -> NifResult<(Atom, ResourceArc<LockedSocket>)> {
 
     let address = str::from_utf8(address.as_slice()).unwrap();
     let address: SocketAddr = address.parse().unwrap();
 
-    let sock = ResourceArc::new(LockedSocketWrapper::new(address, 1024));
+    let cap = event_capacity.try_into().unwrap();
+    let sock = ResourceArc::new(LockedSocket::new(address, cap));
     let sock2 = sock.clone();
 
     let oenv = OwnedEnv::new();
-    std::thread::spawn(move || {
+    thread::spawn(move || {
         oenv.run(|env| {
             loop {
                 sock2.poll(&env, &pid);
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                thread::sleep(time::Duration::from_millis(poll_interval));
             }
         })
     });
@@ -910,7 +914,7 @@ fn socket_open(address: Binary, pid: LocalPid) -> NifResult<(Atom, ResourceArc<L
 }
 
 #[rustler::nif]
-fn socket_send(sock: ResourceArc<LockedSocketWrapper>, peer: ResourceArc<AddressWrapper>,
+fn socket_send(sock: ResourceArc<LockedSocket>, peer: ResourceArc<Peer>,
     packet: Binary) -> NifResult<Atom> {
     let packet = packet.as_slice();
     sock.send(&peer.addr, packet);
@@ -918,7 +922,7 @@ fn socket_send(sock: ResourceArc<LockedSocketWrapper>, peer: ResourceArc<Address
 }
 
 #[rustler::nif]
-fn socket_address_parts(env: Env, peer: ResourceArc<AddressWrapper>)
+fn socket_address_parts(env: Env, peer: ResourceArc<Peer>)
     -> NifResult<(Atom, Binary, u16)> {
 
     let ip_bytes = match peer.addr.ip() {
@@ -980,8 +984,8 @@ rustler::init!(
 
 fn load(env: Env, _: Term) -> bool {
     rustler::resource!(LockedConnection, env);
-    rustler::resource!(AddressWrapper, env);
-    rustler::resource!(LockedSocketWrapper, env);
+    rustler::resource!(Peer, env);
+    rustler::resource!(LockedSocket, env);
     true
 }
 

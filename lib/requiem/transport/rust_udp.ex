@@ -1,5 +1,4 @@
 defmodule Requiem.Transport.RustUDP do
-
   use GenServer
   require Logger
 
@@ -35,10 +34,14 @@ defmodule Requiem.Transport.RustUDP do
     state = new(opts)
 
     case Requiem.QUIC.Socket.open(
-      "0.0.0.0",
-      state.port,
-      self()
-    ) do
+           "0.0.0.0",
+           state.port,
+           self(),
+           # event capacity
+           1000,
+           # poll interval (ms)
+           10
+         ) do
       {:ok, sock} ->
         Logger.debug("<Requiem.Transport.RustUDP> opened")
         Process.flag(:trap_exit, true)
@@ -77,26 +80,30 @@ defmodule Requiem.Transport.RustUDP do
   def handle_info({:__packet__, peer, data}, state) do
     Logger.debug("<Requiem.Transport.RustUDP> @received")
     {:ok, host, port} = Requiem.QUIC.Socket.address_parts(peer)
-    address = if byte_size(host) == 4 do
-      <<n1, n2, n3, n4>> = host
-      Requiem.Address.new({n1, n2, n3, n4}, port, peer)
-    else
-      <<
-        n1 :: unsigned-integer-size(16),
-        n2 :: unsigned-integer-size(16),
-        n3 :: unsigned-integer-size(16),
-        n4 :: unsigned-integer-size(16),
-        n5 :: unsigned-integer-size(16),
-        n6 :: unsigned-integer-size(16),
-        n7 :: unsigned-integer-size(16),
-        n8 :: unsigned-integer-size(16)
-      >> = host
-      Requiem.Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
-    end
+
+    address =
+      if byte_size(host) == 4 do
+        <<n1, n2, n3, n4>> = host
+        Requiem.Address.new({n1, n2, n3, n4}, port, peer)
+      else
+        <<
+          n1::unsigned-integer-size(16),
+          n2::unsigned-integer-size(16),
+          n3::unsigned-integer-size(16),
+          n4::unsigned-integer-size(16),
+          n5::unsigned-integer-size(16),
+          n6::unsigned-integer-size(16),
+          n7::unsigned-integer-size(16),
+          n8::unsigned-integer-size(16)
+        >> = host
+
+        Requiem.Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
+      end
 
     state.dispatcher.dispatch(state.handler, address, data)
     {:noreply, state}
   end
+
   def handle_info({:socket_error, reason}, state) do
     Logger.debug("<Requiem.Transport.RustUDP> rust error: #{reason}")
     {:noreply, state}
@@ -107,6 +114,7 @@ defmodule Requiem.Transport.RustUDP do
     if state.trace do
       Logger.debug("<Requiem.Transport.RustUDP> terminated: #{inspect(reason)}")
     end
+
     :ok
   end
 
@@ -122,16 +130,16 @@ defmodule Requiem.Transport.RustUDP do
 
   defp send_packet(sock, address, packet) do
     Logger.debug("<Requiem.Transport.RustUDP> send packet")
+
     Requiem.QUIC.Socket.send(
       sock,
       address.raw,
       packet
     )
+
     Logger.debug("<Requiem.Transport.RustUDP> send packet done")
   end
 
   defp name(handler),
     do: Module.concat(handler, __MODULE__)
-
 end
-

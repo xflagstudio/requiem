@@ -4,7 +4,7 @@ defmodule Requiem.Address do
   @type t :: %__MODULE__{
           host: :inet.ip_address(),
           port: :inet.port_number(),
-          raw:  nil | term
+          raw: nil | term
         }
 
   defstruct host: nil, port: nil, raw: nil
@@ -14,7 +14,7 @@ defmodule Requiem.Address do
     %__MODULE__{
       host: host,
       port: port,
-      raw:  raw
+      raw: raw
     }
   end
 
