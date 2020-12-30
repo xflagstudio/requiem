@@ -1,5 +1,4 @@
 defmodule RequiemEcho.Handler do
-
   require Logger
   use Requiem, otp_app: :requiem_echo
 
@@ -22,7 +21,6 @@ defmodule RequiemEcho.Handler do
       stream_send(stream_id, data)
       {:ok, conn2, state}
     end
-
   end
 
   @impl Requiem
@@ -37,5 +35,4 @@ defmodule RequiemEcho.Handler do
     Logger.debug("<QuicHandler> terminate: #{inspect(reason)}")
     :ok
   end
-
 end
