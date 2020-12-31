@@ -40,7 +40,7 @@ defmodule Requiem.Transport.RustUDP do
            # event capacity
            1000,
            # poll interval (ms)
-           10
+           5
          ) do
       {:ok, sock} ->
         Logger.debug("<Requiem.Transport.RustUDP> opened")

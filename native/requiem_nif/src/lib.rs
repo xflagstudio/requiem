@@ -69,10 +69,10 @@ struct Socket {
 
 impl Socket {
 
-    pub fn new(address: SocketAddr, capacity: usize) -> Self {
+    pub fn new(sock: std::net::UdpSocket, event_capacity: usize) -> Self {
 
         let buf = [0; 65535];
-        let mut sock = UdpSocket::bind(address).unwrap();
+        let mut sock = UdpSocket::from_std(sock);
 
         let poll = Poll::new().unwrap();
 
@@ -82,7 +82,7 @@ impl Socket {
             Interest::READABLE,
         ).unwrap();
 
-        let events = Events::with_capacity(capacity);
+        let events = Events::with_capacity(event_capacity);
 
         Socket {
             sock:   sock,
@@ -111,12 +111,12 @@ impl Socket {
                                 break;
                             }
                             */
-                            continue;
+                            return;
                         }
                     };
                     if len > 1350 {
                         // too big packet. ignore
-                        continue;
+                        return;
                     }
 
                     let mut packet = OwnedBinary::new(len).unwrap();
@@ -129,41 +129,33 @@ impl Socket {
                     ]));
                 },
                 _ => {
-                    continue;
+                    return;
                 }
             }
         }
     }
 
-    pub fn send(&self, address: &SocketAddr, packet: &[u8]) -> bool {
-        if let Err(_) = self.sock.send_to(packet, *address) {
-            return false
-        } else {
-            return true
-        }
-    }
 }
 
 struct LockedSocket {
-    sock: Mutex<Socket>,
+    sock: Mutex<std::net::UdpSocket>,
 }
 
 impl LockedSocket {
 
-    pub fn new(address: SocketAddr, capacity: usize) -> Self {
+    pub fn new(sock: std::net::UdpSocket) -> Self {
         LockedSocket {
-            sock: Mutex::new(Socket::new(address, capacity)),
+            sock: Mutex::new(sock),
         }
     }
 
-    pub fn poll(&self, env: &Env, pid: &LocalPid) {
-        let mut raw = self.sock.lock().unwrap();
-        raw.poll(env, pid);
-    }
-
-    pub fn send(&self, address: &SocketAddr, packet: &[u8]) {
+    pub fn send(&self, address: &SocketAddr, packet: &[u8]) -> bool {
         let raw = self.sock.lock().unwrap();
-        raw.send(address, packet);
+        if let Err(_) = raw.send_to(packet, *address) {
+            return false
+        } else {
+            return true
+        }
     }
 }
 
@@ -894,22 +886,24 @@ fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interva
     -> NifResult<(Atom, ResourceArc<LockedSocket>)> {
 
     let address = str::from_utf8(address.as_slice()).unwrap();
-    let address: SocketAddr = address.parse().unwrap();
+
+    let std_sock = std::net::UdpSocket::bind(address).unwrap();
+    let std_sock2 = std_sock.try_clone().unwrap();
 
     let cap = event_capacity.try_into().unwrap();
-    let sock = ResourceArc::new(LockedSocket::new(address, cap));
-    let sock2 = sock.clone();
+    let mut receiver = Socket::new(std_sock2, cap);
 
     let oenv = OwnedEnv::new();
     thread::spawn(move || {
         oenv.run(|env| {
             loop {
-                sock2.poll(&env, &pid);
+                receiver.poll(&env, &pid);
                 thread::sleep(time::Duration::from_millis(poll_interval));
             }
         })
     });
 
+    let sock = ResourceArc::new(LockedSocket::new(std_sock));
     Ok((atoms::ok(), sock))
 }
 
