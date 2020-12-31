@@ -11,7 +11,7 @@ use std::convert::TryFrom;
 use crate::common::{self, atoms};
 use crate::config::CONFIGS;
 
-struct Connection {
+pub struct Connection {
     conn: Pin<Box<quiche::Connection>>,
     buf:  [u8; 1350],
 }
@@ -233,7 +233,7 @@ impl Connection {
 
 }
 
-struct LockedConnection {
+pub struct LockedConnection {
     conn: Mutex<Connection>,
 }
 
@@ -248,7 +248,7 @@ impl LockedConnection {
 
 
 #[rustler::nif]
-fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
+pub fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
     -> NifResult<(Atom, ResourceArc<LockedConnection>)> {
 
     let module = module.as_slice();
@@ -275,7 +275,7 @@ fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
 }
 
 #[rustler::nif]
-fn connection_close(env: Env, pid: LocalPid,
+pub fn connection_close(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, app: bool, err: u64, reason: Binary)
     -> NifResult<Atom> {
 
@@ -289,13 +289,13 @@ fn connection_close(env: Env, pid: LocalPid,
 }
 
 #[rustler::nif]
-fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
+pub fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
     let conn = conn.conn.lock();
     conn.is_closed()
 }
 
 #[rustler::nif]
-fn connection_on_packet(env: Env, pid: LocalPid,
+pub fn connection_on_packet(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, packet: Binary)
     -> NifResult<(Atom, u64)> {
 
@@ -310,7 +310,7 @@ fn connection_on_packet(env: Env, pid: LocalPid,
 }
 
 #[rustler::nif]
-fn connection_on_timeout(env: Env, pid: LocalPid,
+pub fn connection_on_timeout(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>)
     -> NifResult<(Atom, u64)> {
 
@@ -324,7 +324,7 @@ fn connection_on_timeout(env: Env, pid: LocalPid,
 }
 
 #[rustler::nif]
-fn connection_stream_send(env: Env, pid: LocalPid,
+pub fn connection_stream_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, stream_id: u64, data: Binary)
     -> NifResult<(Atom, u64)> {
 
@@ -336,7 +336,7 @@ fn connection_stream_send(env: Env, pid: LocalPid,
 }
 
 #[rustler::nif]
-fn connection_dgram_send(env: Env, pid: LocalPid,
+pub fn connection_dgram_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, data: Binary)
     -> NifResult<(Atom, u64)> {
 

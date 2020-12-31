@@ -17,7 +17,7 @@ use std::convert::TryInto;
 
 use crate::common::atoms;
 
-struct Peer {
+pub struct Peer {
     addr: SocketAddr,
 }
 
@@ -29,7 +29,7 @@ impl Peer {
     }
 }
 
-struct Socket {
+pub struct Socket {
     sock:   UdpSocket,
     poll:   Poll,
     events: Events,
@@ -107,7 +107,7 @@ impl Socket {
 
 }
 
-struct LockedSocket {
+pub struct LockedSocket {
     sock: Mutex<std::net::UdpSocket>,
 }
 
@@ -130,7 +130,7 @@ impl LockedSocket {
 }
 
 #[rustler::nif]
-fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interval: u64)
+pub fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interval: u64)
     -> NifResult<(Atom, ResourceArc<LockedSocket>)> {
 
     let address = str::from_utf8(address.as_slice()).unwrap();
@@ -155,7 +155,7 @@ fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interva
 }
 
 #[rustler::nif]
-fn socket_send(sock: ResourceArc<LockedSocket>, peer: ResourceArc<Peer>,
+pub fn socket_send(sock: ResourceArc<LockedSocket>, peer: ResourceArc<Peer>,
     packet: Binary) -> NifResult<Atom> {
     let packet = packet.as_slice();
     sock.send(&peer.addr, packet);
@@ -163,7 +163,7 @@ fn socket_send(sock: ResourceArc<LockedSocket>, peer: ResourceArc<Peer>,
 }
 
 #[rustler::nif]
-fn socket_address_parts(env: Env, peer: ResourceArc<Peer>)
+pub fn socket_address_parts(env: Env, peer: ResourceArc<Peer>)
     -> NifResult<(Atom, Binary, u16)> {
 
     let ip_bytes = match peer.addr.ip() {

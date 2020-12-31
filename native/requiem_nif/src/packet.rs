@@ -11,6 +11,18 @@ use crate::common::{self, atoms};
 type GlobalBuffer = Mutex<HashMap<Vec<u8>, [u8; 1350]>>;
 static BUFFERS: Lazy<GlobalBuffer> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+fn packet_type(ty: quiche::Type) -> Atom {
+    match ty {
+        quiche::Type::Initial            => atoms::initial(),
+        quiche::Type::Short              => atoms::short(),
+        quiche::Type::VersionNegotiation => atoms::version_negotiation(),
+        quiche::Type::Retry              => atoms::retry(),
+        quiche::Type::Handshake          => atoms::handshake(),
+        quiche::Type::ZeroRTT            => atoms::zero_rtt()
+    }
+}
+
+
 pub fn buffer_init(module: &[u8]) {
     let mut buffer_table = BUFFERS.lock();
     if !buffer_table.contains_key(module) {
@@ -85,17 +97,6 @@ pub fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
 
     }
 
-}
-
-fn packet_type(ty: quiche::Type) -> Atom {
-    match ty {
-        quiche::Type::Initial            => atoms::initial(),
-        quiche::Type::Short              => atoms::short(),
-        quiche::Type::VersionNegotiation => atoms::version_negotiation(),
-        quiche::Type::Retry              => atoms::retry(),
-        quiche::Type::Handshake          => atoms::handshake(),
-        quiche::Type::ZeroRTT            => atoms::zero_rtt()
-    }
 }
 
 #[rustler::nif]
