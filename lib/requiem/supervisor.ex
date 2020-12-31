@@ -11,9 +11,6 @@ defmodule Requiem.Supervisor do
   alias Requiem.OutgoingPacket.SenderPool
   alias Requiem.IncomingPacket.DispatcherPool
 
-  @transport_module Requiem.Transport.RustUDP
-  #@transport_module Requiem.Transport.GenUDP
-
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
     %{
@@ -38,15 +35,13 @@ defmodule Requiem.Supervisor do
   end
 
   defp children(handler) do
-    trace = handler |> Config.get!(:trace)
-
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
       {ConnectionSupervisor, handler},
       {SenderPool,
        [
          handler: handler,
-         transport: @transport_module,
+         transport: handler |> transport_module(),
          buffering_interval: handler |> Config.get!(:sender_buffering_interval),
          pool_size: handler |> Config.get!(:sender_pool_size),
          pool_max_overflow: handler |> Config.get!(:sender_pool_max_overflow)
@@ -59,16 +54,40 @@ defmodule Requiem.Supervisor do
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          pool_size: handler |> Config.get!(:dispatcher_pool_size),
          pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
-         trace: trace
+         trace: handler |> Config.get!(:trace)
        ]},
-      {@transport_module,
+      handler |> transport_spec()
+    ]
+  end
+
+  defp transport_module(handler) do
+    if handler |> Config.get!(:rust_transport) do
+      Requiem.Transport.RustUDP
+    else
+      Requiem.Transport.GenUDP
+    end
+  end
+
+  defp transport_spec(handler) do
+    if handler |> Config.get!(:rust_transport) do
+      {Requiem.Transport.RustUDP,
        [
          handler: handler,
          dispatcher: DispatcherPool,
          port: handler |> Config.get!(:port),
-         trace: trace
+         event_capacity: handler |> Config.get!(:rust_transport_event_capacity),
+         polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout),
+         trace: handler |> Config.get!(:trace)
        ]}
-    ]
+    else
+      {Requiem.Transport.GenUDP,
+       [
+         handler: handler,
+         dispatcher: DispatcherPool,
+         port: handler |> Config.get!(:port),
+         trace: handler |> Config.get!(:trace)
+       ]}
+    end
   end
 
   defp name(handler),

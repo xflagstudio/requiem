@@ -7,6 +7,8 @@ defmodule Requiem.Transport.RustUDP do
           dispatcher: module,
           trace: boolean,
           port: non_neg_integer,
+          event_capacity: non_neg_integer,
+          polling_timeout: non_neg_integer,
           sock: port
         }
 
@@ -14,6 +16,8 @@ defmodule Requiem.Transport.RustUDP do
             dispatcher: nil,
             trace: false,
             port: 0,
+            event_capacity: 0,
+            polling_timeout: 0,
             sock: nil
 
   def batch_send(handler, batch) do
@@ -37,10 +41,8 @@ defmodule Requiem.Transport.RustUDP do
            "0.0.0.0",
            state.port,
            self(),
-           # event capacity
-           1000,
-           # poll interval (ms)
-           5
+           state.event_capacity,
+           state.polling_timeout
          ) do
       {:ok, sock} ->
         Logger.debug("<Requiem.Transport.RustUDP> opened")
@@ -123,6 +125,8 @@ defmodule Requiem.Transport.RustUDP do
       handler: Keyword.fetch!(opts, :handler),
       dispatcher: Keyword.fetch!(opts, :dispatcher),
       port: Keyword.fetch!(opts, :port),
+      event_capacity: Keyword.get(opts, :event_capacity, 1024),
+      polling_timeout: Keyword.get(opts, :polling_timeout, 10),
       trace: Keyword.get(opts, :trace, false),
       sock: nil
     }

@@ -14,6 +14,9 @@ defmodule Requiem.Config do
           | :sender_pool_max_overflow
           | :dispatcher_pool_size
           | :dispatcher_pool_max_overflow
+          | :rust_transport
+          | :rust_transport_event_capacity
+          | :rust_transport_polling_timeout
           | :token_secret
           | :connection_id_secret
           | :dgram_queue_size
@@ -52,7 +55,10 @@ defmodule Requiem.Config do
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
     dgram_queue_size: 1000,
-    max_idle_timeout: 60_000
+    max_idle_timeout: 60_000,
+    rust_transport: false,
+    rust_transport_event_capacity: 1024,
+    rust_transport_polling_timeout: 10
   ]
 
   @key_table %{
@@ -64,6 +70,9 @@ defmodule Requiem.Config do
     sender_pool_max_overflow: true,
     dispatcher_pool_size: true,
     dispatcher_pool_max_overflow: true,
+    rust_transport: true,
+    rust_transport_event_capacity: true,
+    rust_transport_polling_timeout: true,
     token_secret: true,
     connection_id_secret: true,
     dgram_queue_size: true,
