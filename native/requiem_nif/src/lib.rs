@@ -92,9 +92,10 @@ impl Socket {
         }
     }
 
-    pub fn poll(&mut self, env: &Env, pid: &LocalPid) {
+    pub fn poll(&mut self, env: &Env, pid: &LocalPid, interval: u64) {
 
-        self.poll.poll(&mut self.events, None).unwrap();
+        let timeout = time::Duration::from_millis(interval);
+        self.poll.poll(&mut self.events, Some(timeout)).unwrap();
 
         for event in self.events.iter() {
             match event.token() {
@@ -897,8 +898,7 @@ fn socket_open(address: Binary, pid: LocalPid, event_capacity: u64, poll_interva
     thread::spawn(move || {
         oenv.run(|env| {
             loop {
-                receiver.poll(&env, &pid);
-                thread::sleep(time::Duration::from_millis(poll_interval));
+                receiver.poll(&env, &pid, poll_interval);
             }
         })
     });

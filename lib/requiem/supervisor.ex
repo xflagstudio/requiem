@@ -11,7 +11,7 @@ defmodule Requiem.Supervisor do
   alias Requiem.OutgoingPacket.SenderPool
   alias Requiem.IncomingPacket.DispatcherPool
 
-  #@transport_module Requiem.Transport.RustUDP
+  # @transport_module Requiem.Transport.RustUDP
   @transport_module Requiem.Transport.GenUDP
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
