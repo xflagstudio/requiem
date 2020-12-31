@@ -5,7 +5,7 @@ use rustler::types::{LocalPid, Encoder};
 use rustler::env::{OwnedEnv};
 
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 
 use mio::{Events, Interest, Poll, Token};
 use mio::net::UdpSocket;
@@ -16,7 +16,6 @@ use std::time;
 use std::net::{SocketAddr, IpAddr};
 use std::pin::Pin;
 use std::convert::{TryInto, TryFrom};
-use std::sync::Mutex;
 use std::collections::HashMap;
 
 mod atoms {
@@ -42,11 +41,8 @@ mod atoms {
     }
 }
 
-type GlobalBuffer = Mutex<[u8; 1350]>;
-type GlobalBufferTable = RwLock<HashMap<Vec<u8>, GlobalBuffer>>;
-
-type SyncConfig = Mutex<quiche::Config>;
-type SyncConfigTable = RwLock<HashMap<Vec<u8>, SyncConfig>>;
+type GlobalBuffer = Mutex<HashMap<Vec<u8>, [u8; 1350]>>;
+type SyncConfig = Mutex<HashMap<Vec<u8>, quiche::Config>>;
 
 struct Peer {
     addr: SocketAddr,
@@ -151,7 +147,7 @@ impl LockedSocket {
     }
 
     pub fn send(&self, address: &SocketAddr, packet: &[u8]) -> bool {
-        let raw = self.sock.lock().unwrap();
+        let raw = self.sock.lock();
         if let Err(_) = raw.send_to(packet, *address) {
             return false
         } else {
@@ -160,8 +156,8 @@ impl LockedSocket {
     }
 }
 
-static CONFIGS: Lazy<SyncConfigTable> = Lazy::new(|| RwLock::new(HashMap::new()));
-static BUFFERS: Lazy<GlobalBufferTable> = Lazy::new(|| RwLock::new(HashMap::new()));
+static CONFIGS: Lazy<SyncConfig> = Lazy::new(|| Mutex::new(HashMap::new()));
+static BUFFERS: Lazy<GlobalBuffer> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 struct Connection {
     conn: Pin<Box<quiche::Connection>>,
@@ -406,11 +402,9 @@ fn set_config<F>(module: Binary, setter: F) -> NifResult<Atom>
     where F: FnOnce(&mut quiche::Config) -> quiche::Result<()> {
 
     let module = module.as_slice();
-    let mut config_table = CONFIGS.write();
+    let mut config_table = CONFIGS.lock();
 
-    if let Some(config) = config_table.get_mut(module) {
-
-        let mut c = config.lock().unwrap();
+    if let Some(c) = config_table.get_mut(module) {
 
         match setter(&mut *c) {
             Ok(()) =>
@@ -464,7 +458,7 @@ fn quic_init(module: Binary) -> NifResult<Atom> {
 
 fn config_init(module: &[u8]) -> NifResult<Atom> {
 
-    let mut config_table = CONFIGS.write();
+    let mut config_table = CONFIGS.lock();
 
     if config_table.contains_key(module) {
 
@@ -474,7 +468,7 @@ fn config_init(module: &[u8]) -> NifResult<Atom> {
 
         match quiche::Config::new(quiche::PROTOCOL_VERSION) {
             Ok(config) => {
-                config_table.insert(module.to_vec(), Mutex::new(config));
+                config_table.insert(module.to_vec(), config);
                 Ok(atoms::ok())
             },
 
@@ -486,9 +480,9 @@ fn config_init(module: &[u8]) -> NifResult<Atom> {
 }
 
 fn buffer_init(module: &[u8]) {
-    let mut buffer_table = BUFFERS.write();
+    let mut buffer_table = BUFFERS.lock();
     if !buffer_table.contains_key(module) {
-        buffer_table.insert(module.to_vec(), Mutex::new([0; 1350]));
+        buffer_table.insert(module.to_vec(), [0; 1350]);
     }
 }
 
@@ -668,11 +662,9 @@ fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
     let scid   = scid.as_slice();
     let odcid  = odcid.as_slice();
 
-    let mut config_table = CONFIGS.write();
+    let mut config_table = CONFIGS.lock();
 
-    if let Some(config) = config_table.get_mut(module) {
-
-        let mut c = config.lock().unwrap();
+    if let Some(mut c) = config_table.get_mut(module) {
 
         match quiche::accept(scid, Some(odcid), &mut c) {
             Ok(conn) =>
@@ -694,7 +686,7 @@ fn connection_close(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, app: bool, err: u64, reason: Binary)
     -> NifResult<Atom> {
 
-    let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock();
 
     match conn.close(&env, &pid, app, err, reason.as_slice()) {
         Ok(_)       => Ok(atoms::ok()),
@@ -705,7 +697,7 @@ fn connection_close(env: Env, pid: LocalPid,
 
 #[rustler::nif]
 fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
-    let conn = conn.conn.lock().unwrap();
+    let conn = conn.conn.lock();
     conn.is_closed()
 }
 
@@ -714,7 +706,7 @@ fn connection_on_packet(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, packet: Binary)
     -> NifResult<(Atom, u64)> {
 
-    let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock();
     let mut packet = packet.to_owned().unwrap();
 
     match conn.on_packet(&env, &pid, &mut packet.as_mut_slice()) {
@@ -729,7 +721,7 @@ fn connection_on_timeout(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>)
     -> NifResult<(Atom, u64)> {
 
-    let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock();
 
     match conn.on_timeout(&env, &pid) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
@@ -743,7 +735,7 @@ fn connection_stream_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, stream_id: u64, data: Binary)
     -> NifResult<(Atom, u64)> {
 
-    let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock();
     match conn.stream_send(&env, &pid, stream_id, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason)      => Err(error_term(reason)),
@@ -755,7 +747,7 @@ fn connection_dgram_send(env: Env, pid: LocalPid,
     conn: ResourceArc<LockedConnection>, data: Binary)
     -> NifResult<(Atom, u64)> {
 
-    let mut conn = conn.conn.lock().unwrap();
+    let mut conn = conn.conn.lock();
     match conn.dgram_send(&env, &pid, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason)      => Err(error_term(reason)),
@@ -818,11 +810,9 @@ fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Binary
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let mut buffer_table = BUFFERS.write();
+    let mut buffer_table = BUFFERS.lock();
 
-    if let Some(buffer) = buffer_table.get_mut(module) {
-
-        let mut buf = buffer.lock().unwrap();
+    if let Some(buf) = buffer_table.get_mut(module) {
 
         let scid = scid.as_slice();
         let dcid = dcid.as_slice();
@@ -849,11 +839,9 @@ fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let mut buffer_table = BUFFERS.write();
+    let mut buffer_table = BUFFERS.lock();
 
-    if let Some(buffer) = buffer_table.get_mut(module) {
-
-        let mut buf = buffer.lock().unwrap();
+    if let Some(buf) = buffer_table.get_mut(module) {
 
         let scid  = scid.as_slice();
         let odcid = odcid.as_slice();
