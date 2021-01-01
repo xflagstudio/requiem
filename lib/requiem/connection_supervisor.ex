@@ -24,7 +24,7 @@ defmodule Requiem.ConnectionSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  @spec lookup_connection(module, binary, Address.t()) :: {:ok, binary} | {:error, :not_found}
+  @spec lookup_connection(module, binary, Address.t()) :: {:ok, pid} | {:error, :not_found}
   def lookup_connection(handler, <<>>, address) do
     case AddressTable.lookup(handler, address) do
       {:ok, dcid} ->

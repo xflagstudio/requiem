@@ -34,7 +34,8 @@ defmodule Requiem.Supervisor do
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
 
-  defp children(handler) do
+  @spec children(module) :: [:supervisor.child_spec() | {module, term} | module]
+  def children(handler) do
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
       {ConnectionSupervisor, handler},

@@ -69,7 +69,6 @@ defmodule Requiem.StreamId do
       0x01 -> {:ok, :server, :bidi}
       0x02 -> {:ok, :client, :uni}
       0x03 -> {:ok, :server, :uni}
-      _ -> :error
     end
   end
 end

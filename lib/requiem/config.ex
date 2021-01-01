@@ -119,7 +119,7 @@ defmodule Requiem.Config do
     end
   end
 
-  @spec setup(module, atom) :: :ok
+  @spec setup(module, atom) :: no_return
   def setup(handler, otp_app) do
     config1 = Application.get_env(otp_app, handler, [])
     config2 = Keyword.merge(@default_values, config1)

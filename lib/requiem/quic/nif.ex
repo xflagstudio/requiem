@@ -93,7 +93,7 @@ defmodule Requiem.QUIC.NIF do
   def connection_accept(_module, _scid, _odcid), do: error()
 
   @spec connection_close(pid, term, boolean, non_neg_integer, binary) ::
-          :ok | {:error, :system_error}
+          :ok | {:error, :system_error | :already_closed}
   def connection_close(_pid, _conn, _app, _err, _reason), do: error()
 
   @spec connection_is_closed(term) :: boolean

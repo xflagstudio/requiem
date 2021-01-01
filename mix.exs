@@ -37,11 +37,11 @@ defmodule Requiem.MixProject do
   defp deps do
     [
       {:ex_doc, "~> 0.23", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:toml, "~> 0.5"},
       {:hkdf, "~> 0.1.0"},
       {:fastglobal, "~> 1.0"},
       {:poolboy, "~> 1.5"},
-      {:dialyxir, "~> 1.0", only: [:dev]},
       {:rustler, "~> 0.22.0-rc.0"}
     ]
   end
