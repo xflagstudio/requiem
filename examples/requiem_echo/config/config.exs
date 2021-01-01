@@ -17,4 +17,4 @@ config :requiem_echo, RequiemEcho.Handler,
   enable_early_data: true,
   enable_dgram: true
 
-config :requiem, :traceable, true
+config :requiem, :trace, true
