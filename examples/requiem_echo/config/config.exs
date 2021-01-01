@@ -16,3 +16,5 @@ config :requiem_echo, RequiemEcho.Handler,
   disable_active_migration: true,
   enable_early_data: true,
   enable_dgram: true
+
+config :requiem, :traceable, true
