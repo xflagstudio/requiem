@@ -3,23 +3,50 @@ use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{LocalPid, Encoder};
 
-use parking_lot::Mutex;
+use once_cell::sync::Lazy;
+use parking_lot::{RwLock, Mutex};
 
 use std::pin::Pin;
 use std::convert::TryFrom;
 
+use std::collections::HashMap;
+
 use crate::common::{self, atoms};
 use crate::config::CONFIGS;
 
+type ModuleName = Vec<u8>;
+type BufferSlot = Vec<Mutex<Box<[u8]>>>;
+type StreamDataBuffer = RwLock<HashMap<ModuleName, BufferSlot>>;
+
+static STREAM_DATA_BUFFERS: Lazy<StreamDataBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
+
+pub fn buffer_init(module: &[u8], num: u64, size: usize) {
+    let mut buffer_table = STREAM_DATA_BUFFERS.write();
+    if !buffer_table.contains_key(module) {
+        let mut slot = Vec::new();
+        for _ in 0..num {
+            let v = unsafe {
+                let mut v: Vec<u8> = Vec::with_capacity(size);
+                v.set_len(size);
+                v
+            };
+            slot.push(Mutex::new(v.into_boxed_slice()));
+        }
+        buffer_table.insert(module.to_vec(), slot);
+    }
+}
+
 pub struct Connection {
+    module: Vec<u8>,
     conn: Pin<Box<quiche::Connection>>,
     buf:  [u8; 1350],
 }
 
 impl Connection {
 
-    pub fn new(conn: Pin<Box<quiche::Connection>>) -> Self {
+    pub fn new(module: &[u8], conn: Pin<Box<quiche::Connection>>) -> Self {
         Connection {
+            module: module.to_vec(),
             conn: conn,
             buf:  [0; 1350],
         }
@@ -60,21 +87,31 @@ impl Connection {
 
         if self.conn.is_in_early_data() || self.conn.is_established() {
 
-            for s in self.conn.readable() {
+            let buffer_table = STREAM_DATA_BUFFERS.read();
 
-                // XXX need more bigger buffer
-                while let Ok((len, _fin)) = self.conn.stream_recv(s, &mut self.buf) {
+            if let Some(buf) = buffer_table.get(&self.module) {
 
-                    let mut data = OwnedBinary::new(len).unwrap();
-                    data.as_mut_slice().copy_from_slice(&self.buf[..len]);
-                    // {:stream, 1, "Hello"}
-                    env.send(pid, make_tuple(*env, &[
-                            atoms::__stream_recv__().to_term(*env),
-                            s.encode(*env),
-                            data.release(*env).to_term(*env),
-                    ]))
+                // mitigate lock-wait
+                let mut buf = buf[common::random_slot_index(buf.len())].lock();
+
+                for s in self.conn.readable() {
+
+                    while let Ok((len, _fin)) = self.conn.stream_recv(s, &mut buf) {
+
+                        let mut data = OwnedBinary::new(len).unwrap();
+                        data.as_mut_slice().copy_from_slice(&buf[..len]);
+
+                        env.send(pid, make_tuple(*env, &[
+                                atoms::__stream_recv__().to_term(*env),
+                                s.encode(*env),
+                                data.release(*env).to_term(*env),
+                        ]))
+                    }
                 }
+
             }
+
+
         }
     }
 
@@ -239,9 +276,9 @@ pub struct LockedConnection {
 
 impl LockedConnection {
 
-    pub fn new(raw: Pin<Box<quiche::Connection>>) -> Self {
+    pub fn new(module: &[u8], raw: Pin<Box<quiche::Connection>>) -> Self {
         LockedConnection {
-            conn: Mutex::new(Connection::new(raw)),
+            conn: Mutex::new(Connection::new(module, raw)),
         }
     }
 }
@@ -263,7 +300,7 @@ pub fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
 
         match quiche::accept(scid, Some(odcid), &mut c) {
             Ok(conn) =>
-                Ok((atoms::ok(), ResourceArc::new(LockedConnection::new(conn)))),
+                Ok((atoms::ok(), ResourceArc::new(LockedConnection::new(module, conn)))),
 
             Err(_) =>
                 Err(common::error_term(atoms::system_error())),

@@ -8,9 +8,21 @@ mod packet;
 mod socket;
 
 #[rustler::nif]
-fn quic_init(module: Binary) -> NifResult<Atom> {
+fn quic_init(module: Binary,
+    retry_buffer_num: u64,
+    stream_buffer_num: u64,
+    stream_buffer_size: usize,
+    ) -> NifResult<Atom> {
     let module  = module.as_slice();
-    packet::buffer_init(&module);
+    packet::buffer_init(
+        &module,
+        retry_buffer_num,
+    );
+    connection::buffer_init(
+        &module,
+        stream_buffer_num,
+        stream_buffer_size,
+    );
     config::config_init(&module)
 }
 

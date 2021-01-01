@@ -206,6 +206,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "quiche",
+ "ring",
  "rustler",
 ]
 

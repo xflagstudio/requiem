@@ -1,8 +1,9 @@
 defmodule Requiem.QUIC.NIF do
   use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
-  @spec quic_init(binary) :: :ok | {:error, :system_error}
-  def quic_init(_module), do: error()
+  @spec quic_init(binary, non_neg_integer, non_neg_integer, non_neg_integer) ::
+          :ok | {:error, :system_error}
+  def quic_init(_module, _retry_buffer_num, _stream_buffer_num, _stream_buffer_size), do: error()
 
   @spec config_load_cert_chain_from_pem_file(binary, binary) ::
           :ok | {:error, :system_error | :not_found}

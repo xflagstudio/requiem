@@ -10,7 +10,8 @@ use std::collections::HashMap;
 
 use crate::common::{self, atoms};
 
-type SyncConfig = RwLock<HashMap<Vec<u8>, Mutex<quiche::Config>>>;
+type ModuleName = Vec<u8>;
+type SyncConfig = RwLock<HashMap<ModuleName, Mutex<quiche::Config>>>;
 
 pub(crate) static CONFIGS: Lazy<SyncConfig> = Lazy::new(|| RwLock::new(HashMap::new()));
 

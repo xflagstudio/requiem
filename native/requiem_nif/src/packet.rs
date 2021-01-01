@@ -8,8 +8,11 @@ use std::collections::HashMap;
 
 use crate::common::{self, atoms};
 
-type GlobalBuffer = RwLock<HashMap<Vec<u8>, Mutex<[u8; 1350]>>>;
-static BUFFERS: Lazy<GlobalBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
+type ModuleName = Vec<u8>;
+type BufferSlot = Vec<Mutex<[u8; 1350]>>;
+type PacketBuilderBuffer = RwLock<HashMap<ModuleName, BufferSlot>>;
+
+static PACKET_BUILDER_BUFFERS: Lazy<PacketBuilderBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 fn packet_type(ty: quiche::Type) -> Atom {
     match ty {
@@ -22,14 +25,17 @@ fn packet_type(ty: quiche::Type) -> Atom {
     }
 }
 
-
-pub fn buffer_init(module: &[u8]) {
-    let mut buffer_table = BUFFERS.write();
+pub fn buffer_init(module: &[u8], num: u64) {
+    let mut buffer_table = PACKET_BUILDER_BUFFERS.write();
     if !buffer_table.contains_key(module) {
-        buffer_table.insert(module.to_vec(), Mutex::new([0; 1350]));
+        let mut slot = Vec::new();
+        for _ in 0..num {
+            slot.push(Mutex::new([0; 1350]));
+        }
+
+        buffer_table.insert(module.to_vec(), slot);
     }
 }
-
 
 fn header_token_binary(hdr: &quiche::Header) -> NifResult<OwnedBinary> {
 
@@ -104,11 +110,11 @@ pub fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Bi
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = BUFFERS.read();
+    let buffer_table = PACKET_BUILDER_BUFFERS.read();
 
     if let Some(buf) = buffer_table.get(module) {
 
-        let mut buf = buf.lock();
+        let mut buf = buf[common::random_slot_index(buf.len())].lock();
 
         let scid = scid.as_slice();
         let dcid = dcid.as_slice();
@@ -135,11 +141,11 @@ pub fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let buffer_table = BUFFERS.read();
+    let buffer_table = PACKET_BUILDER_BUFFERS.read();
 
     if let Some(buf) = buffer_table.get(module) {
 
-        let mut buf = buf.lock();
+        let mut buf = buf[common::random_slot_index(buf.len())].lock();
 
         let scid  = scid.as_slice();
         let odcid = odcid.as_slice();
