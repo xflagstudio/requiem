@@ -1,11 +1,15 @@
 defmodule Requiem.Transport.RustUDP do
   use GenServer
   require Logger
+  require Requiem.Tracer
+
+  alias Requiem.Address
+  alias Requiem.QUIC
+  alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
           dispatcher: module,
-          trace: boolean,
           port: non_neg_integer,
           event_capacity: non_neg_integer,
           polling_timeout: non_neg_integer,
@@ -14,7 +18,6 @@ defmodule Requiem.Transport.RustUDP do
 
   defstruct handler: nil,
             dispatcher: nil,
-            trace: false,
             port: 0,
             event_capacity: 0,
             polling_timeout: 0,
@@ -37,7 +40,7 @@ defmodule Requiem.Transport.RustUDP do
   def init(opts) do
     state = new(opts)
 
-    case Requiem.QUIC.Socket.open(
+    case QUIC.Socket.open(
            "0.0.0.0",
            state.port,
            self(),
@@ -45,7 +48,7 @@ defmodule Requiem.Transport.RustUDP do
            state.polling_timeout
          ) do
       {:ok, sock} ->
-        Logger.debug("<Requiem.Transport.RustUDP> opened")
+        Logger.info("<Requiem.Transport.RustUDP> opened")
         Process.flag(:trap_exit, true)
         {:ok, %{state | sock: sock}}
 
@@ -62,13 +65,13 @@ defmodule Requiem.Transport.RustUDP do
 
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
-    Logger.debug("<Requiem.Transport.RustUDP> @send")
+    Tracer.trace(__MODULE__, "@send")
     send_packet(state.sock, address, packet)
     {:noreply, state}
   end
 
   def handle_cast({:batch_send, batch}, state) do
-    Logger.debug("<Requiem.Transport.RustUDP> @batch_send")
+    Tracer.trace(__MODULE__, "@batch_send")
 
     batch
     |> Enum.each(fn {address, packet} ->
@@ -80,13 +83,13 @@ defmodule Requiem.Transport.RustUDP do
 
   @impl GenServer
   def handle_info({:__packet__, peer, data}, state) do
-    Logger.debug("<Requiem.Transport.RustUDP> @received")
-    {:ok, host, port} = Requiem.QUIC.Socket.address_parts(peer)
+    Tracer.trace(__MODULE__, "@received")
+    {:ok, host, port} = QUIC.Socket.address_parts(peer)
 
     address =
       if byte_size(host) == 4 do
         <<n1, n2, n3, n4>> = host
-        Requiem.Address.new({n1, n2, n3, n4}, port, peer)
+        Address.new({n1, n2, n3, n4}, port, peer)
       else
         <<
           n1::unsigned-integer-size(16),
@@ -99,7 +102,7 @@ defmodule Requiem.Transport.RustUDP do
           n8::unsigned-integer-size(16)
         >> = host
 
-        Requiem.Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
+        Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
       end
 
     state.dispatcher.dispatch(state.handler, address, data)
@@ -107,16 +110,13 @@ defmodule Requiem.Transport.RustUDP do
   end
 
   def handle_info({:socket_error, reason}, state) do
-    Logger.debug("<Requiem.Transport.RustUDP> rust error: #{reason}")
+    Tracer.trace(__MODULE__, "@rust_error: #{inspect(reason)}")
     {:noreply, state}
   end
 
   @impl GenServer
-  def terminate(reason, state) do
-    if state.trace do
-      Logger.debug("<Requiem.Transport.RustUDP> terminated: #{inspect(reason)}")
-    end
-
+  def terminate(reason, _state) do
+    Logger.info("<Requiem.Transport.RustUDP> @terminate: #{inspect(reason)}")
     :ok
   end
 
@@ -127,21 +127,18 @@ defmodule Requiem.Transport.RustUDP do
       port: Keyword.fetch!(opts, :port),
       event_capacity: Keyword.get(opts, :event_capacity, 1024),
       polling_timeout: Keyword.get(opts, :polling_timeout, 10),
-      trace: Keyword.get(opts, :trace, false),
       sock: nil
     }
   end
 
   defp send_packet(sock, address, packet) do
-    Logger.debug("<Requiem.Transport.RustUDP> send packet")
+    Tracer.trace(__MODULE__, "send packet")
 
-    Requiem.QUIC.Socket.send(
+    QUIC.Socket.send(
       sock,
       address.raw,
       packet
     )
-
-    Logger.debug("<Requiem.Transport.RustUDP> send packet done")
   end
 
   defp name(handler),

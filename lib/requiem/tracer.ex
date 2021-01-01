@@ -3,6 +3,7 @@ defmodule Requiem.Tracer do
   defmacro trace(caller, msg) do
     if @traceable do
       quote do
+        require Logger
         Logger.debug("<#{unquote(caller)}> #{unquote(msg)}")
       end
     end
@@ -11,6 +12,7 @@ defmodule Requiem.Tracer do
   defmacro trace(caller, trace_id, msg) do
     if @traceable do
       quote do
+        require Logger
         Logger.debug("<#{unquote(caller)}:#{unquote(trace_id)}> #{unquote(msg)}")
       end
     end
@@ -19,6 +21,7 @@ defmodule Requiem.Tracer do
   defmacro trace_fn(caller, trace_id, msg) do
     if @traceable do
       quote do
+        require Logger
         Logger.debug("<#{unquote(caller)}:#{unquote(trace_id)}> #{unquote(msg)()}")
       end
     end

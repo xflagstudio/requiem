@@ -1,22 +1,31 @@
 defmodule Requiem.IncomingPacket.DispatcherWorker do
   require Logger
+  require Requiem.Tracer
   use GenServer
+
+  alias Requiem.Address
+  alias Requiem.Connection
+  alias Requiem.ConnectionID
+  alias Requiem.ConnectionSupervisor
+  alias Requiem.QUIC
+  alias Requiem.RetryToken
+  alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
           transport: module,
           token_secret: binary,
           conn_id_secret: binary,
-          trace: boolean
+          trace_id: binary
         }
 
   defstruct handler: nil,
             transport: nil,
             token_secret: "",
             conn_id_secret: "",
-            trace: false
+            trace_id: ""
 
-  @spec dispatch(pid, Requiem.Address.t(), iodata()) ::
+  @spec dispatch(pid, Address.t(), iodata()) ::
           :ok | {:error, :timeout}
   def dispatch(pid, address, packet) do
     try do
@@ -24,7 +33,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       :ok
     catch
       :exit, _ ->
-        Logger.error("<Requiem.IncomingPacket.DispatcherWorker> failed to dispatch packet")
+        Tracer.trace(__MODULE__, "dispatch: failed")
         {:error, :timeout}
     end
   end
@@ -41,17 +50,17 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   @impl GenServer
   def handle_call({:packet, address, packet}, _from, state) do
-    case Requiem.QUIC.Packet.parse_header(packet) do
+    case QUIC.Packet.parse_header(packet) do
       {:ok, scid, dcid, _token, _version, :initial, false} ->
-        trace("@unsupported_version", dcid, scid, "", state)
+        Tracer.trace(__MODULE__, state.trace_id, "@unsupported_version")
         handle_version_unsupported_packet(address, scid, dcid, state)
 
       {:ok, scid, dcid, token, version, :initial, true} ->
-        trace("@init", dcid, scid, "", state)
+        Tracer.trace(__MODULE__, state.trace_id, "@init")
         handle_init_packet(address, packet, scid, dcid, token, version, state)
 
       {:ok, scid, dcid, _token, _version, packet_type, _version_supported} ->
-        trace("@regular: #{packet_type}", dcid, scid, "", state)
+        Tracer.trace(__MODULE__, state.trace_id, "@regular: #{packet_type}")
         handle_regular_packet(address, packet, scid, dcid, state)
 
       {:error, reason} ->
@@ -85,28 +94,28 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       transport: Keyword.fetch!(opts, :transport),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
-      trace: Keyword.get(opts, :trace, false)
+      trace_id: inspect(self())
     }
   end
 
   defp handle_regular_packet(address, packet, _scid, dcid, state)
        when byte_size(dcid) == 20 or byte_size(dcid) == 0 do
-    case Requiem.ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
+    case ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
       {:ok, pid} ->
-        Requiem.Connection.process_packet(pid, address, packet)
+        Connection.process_packet(pid, address, packet)
 
       {:error, :not_found} ->
         :error
     end
   end
 
-  defp handle_regular_packet(_address, _packet, scid, dcid, state) do
-    trace("@regular: bad dcid", scid, dcid, "", state)
+  defp handle_regular_packet(_address, _packet, _scid, _dcid, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@regular: bad dcid")
     :ok
   end
 
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
-    case Requiem.QUIC.Packet.build_negotiate_version(state.handler, scid, dcid) do
+    case QUIC.Packet.build_negotiate_version(state.handler, scid, dcid) do
       {:ok, resp} ->
         state.transport.send(state.handler, address, resp)
         :ok
@@ -118,12 +127,12 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   defp handle_token_missing_packet(address, scid, dcid, version, state) do
     with {:ok, new_id} <-
-           Requiem.ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
+           ConnectionID.generate_from_odcid(state.conn_id_secret, dcid),
          {:ok, token} <-
-           Requiem.RetryToken.create(address, dcid, new_id, state.token_secret),
+           RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
-           Requiem.QUIC.Packet.build_retry(state.handler, scid, dcid, new_id, token, version) do
-      trace("@send", dcid, scid, "", state)
+           QUIC.Packet.build_retry(state.handler, scid, dcid, new_id, token, version) do
+      Tracer.trace(__MODULE__, state.trace_id, "@send")
       state.transport.send(state.handler, address, resp)
       :ok
     else
@@ -134,11 +143,11 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   defp handle_retry_packet(address, packet, scid, dcid, token, state)
        when byte_size(dcid) == 20 do
-    trace("@validate", dcid, scid, "", state)
+    Tracer.trace(__MODULE__, state.trace_id, "@validate")
 
-    case Requiem.RetryToken.validate(address, dcid, state.token_secret, token) do
+    case RetryToken.validate(address, dcid, state.token_secret, token) do
       {:ok, odcid} ->
-        trace("@validate: success", dcid, scid, odcid, state)
+        Tracer.trace(__MODULE__, state.trace_id, "@validate_success")
 
         case create_connection_if_needed(
                state.handler,
@@ -146,8 +155,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
                address,
                scid,
                dcid,
-               odcid,
-               state.trace
+               odcid
              ) do
           :ok ->
             handle_regular_packet(address, packet, scid, dcid, state)
@@ -161,50 +169,39 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     end
   end
 
-  defp handle_retry_packet(_address, _packet, scid, dcid, _token, state) do
-    trace("@validate: bad dcid", dcid, scid, "", state)
+  defp handle_retry_packet(_address, _packet, _scid, _dcid, _token, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@validate: bad dcid")
     :error
   end
 
   defp handle_init_packet(address, packet, scid, dcid, token, version, state) do
-    case Requiem.ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
+    case ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
       {:ok, pid} ->
-        Requiem.Connection.process_packet(pid, address, packet)
+        Connection.process_packet(pid, address, packet)
 
       {:error, :not_found} ->
         if token == "" do
-          trace("@token_missing_packet", dcid, scid, "", state)
+          Tracer.trace(__MODULE__, state.trace_id, "@token_missing_packet")
           handle_token_missing_packet(address, scid, dcid, version, state)
         else
-          trace("@retry_packet", dcid, scid, "", state)
+          Tracer.trace(__MODULE__, state.trace_id, "@retry_packet")
           handle_retry_packet(address, packet, scid, dcid, token, state)
         end
     end
   end
 
-  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid, _trace) do
+  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid) do
     :ok
   end
 
-  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid, trace) do
-    Requiem.ConnectionSupervisor.create_connection(
+  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid) do
+    ConnectionSupervisor.create_connection(
       handler,
       transport,
       address,
       scid,
       dcid,
-      odcid,
-      trace
+      odcid
     )
   end
-
-  defp trace(message, dcid, scid, odcid, %__MODULE__{trace: true}) do
-    Logger.debug(
-      "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> #{message} <dcid:#{
-        Base.encode16(dcid)
-      }, scid: #{Base.encode16(scid)}, odcid: #{Base.encode16(odcid)}>"
-    )
-  end
-
-  defp trace(_message, _dcid, _scid, _odcid, _state), do: :ok
 end

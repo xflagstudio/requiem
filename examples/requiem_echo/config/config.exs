@@ -1,7 +1,6 @@
 import Config
 
 config :requiem_echo, RequiemEcho.Handler,
-  trace: true,
   port: 3000,
   cert_chain: System.get_env("CERT"),
   priv_key: System.get_env("PRIV_KEY"),
@@ -15,6 +14,7 @@ config :requiem_echo, RequiemEcho.Handler,
   initial_max_streams_bidi: 10,
   disable_active_migration: true,
   enable_early_data: true,
+  rust_transport: true,
   enable_dgram: true
 
 config :requiem, :trace, true

@@ -8,7 +8,6 @@ defmodule Requiem.Config do
   @type config_key ::
           :web_transport
           | :port
-          | :trace
           | :sender_buffering_interval
           | :sender_pool_size
           | :sender_pool_max_overflow
@@ -46,7 +45,6 @@ defmodule Requiem.Config do
   @default_values [
     web_transport: true,
     port: 443,
-    trace: false,
     sender_buffering_interval: 0,
     sender_pool_size: 10,
     sender_pool_max_overflow: 0,
@@ -64,7 +62,6 @@ defmodule Requiem.Config do
   @key_table %{
     web_transport: true,
     port: true,
-    trace: true,
     sender_buffering_interval: true,
     sender_pool_size: true,
     sender_pool_max_overflow: true,

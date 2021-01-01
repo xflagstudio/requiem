@@ -53,8 +53,7 @@ defmodule Requiem.Supervisor do
          token_secret: handler |> Config.get!(:token_secret),
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          pool_size: handler |> Config.get!(:dispatcher_pool_size),
-         pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
-         trace: handler |> Config.get!(:trace)
+         pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow)
        ]},
       handler |> transport_spec()
     ]
@@ -76,16 +75,14 @@ defmodule Requiem.Supervisor do
          dispatcher: DispatcherPool,
          port: handler |> Config.get!(:port),
          event_capacity: handler |> Config.get!(:rust_transport_event_capacity),
-         polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout),
-         trace: handler |> Config.get!(:trace)
+         polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout)
        ]}
     else
       {Requiem.Transport.GenUDP,
        [
          handler: handler,
          dispatcher: DispatcherPool,
-         port: handler |> Config.get!(:port),
-         trace: handler |> Config.get!(:trace)
+         port: handler |> Config.get!(:port)
        ]}
     end
   end
