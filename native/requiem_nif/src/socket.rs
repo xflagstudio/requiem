@@ -98,9 +98,7 @@ impl Socket {
                             packet.release(*env).to_term(*env),
                     ]));
                 },
-                _ => {
-                    return;
-                }
+                _ => {},
             }
         }
     }

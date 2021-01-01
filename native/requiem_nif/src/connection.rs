@@ -255,9 +255,11 @@ pub fn connection_accept(module: Binary, scid: Binary, odcid: Binary)
     let scid   = scid.as_slice();
     let odcid  = odcid.as_slice();
 
-    let mut config_table = CONFIGS.lock();
+    let config_table = CONFIGS.read();
 
-    if let Some(mut c) = config_table.get_mut(module) {
+    if let Some(c) = config_table.get(module) {
+
+        let mut c = c.lock();
 
         match quiche::accept(scid, Some(odcid), &mut c) {
             Ok(conn) =>

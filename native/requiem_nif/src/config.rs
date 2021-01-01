@@ -2,7 +2,7 @@ use rustler::{Atom, NifResult};
 use rustler::types::binary::Binary;
 
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
+use parking_lot::{RwLock, Mutex};
 
 use std::str;
 use std::convert::TryInto;
@@ -10,13 +10,13 @@ use std::collections::HashMap;
 
 use crate::common::{self, atoms};
 
-type SyncConfig = Mutex<HashMap<Vec<u8>, quiche::Config>>;
+type SyncConfig = RwLock<HashMap<Vec<u8>, Mutex<quiche::Config>>>;
 
-pub(crate) static CONFIGS: Lazy<SyncConfig> = Lazy::new(|| Mutex::new(HashMap::new()));
+pub(crate) static CONFIGS: Lazy<SyncConfig> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn config_init(module: &[u8]) -> NifResult<Atom> {
 
-    let mut config_table = CONFIGS.lock();
+    let mut config_table = CONFIGS.write();
 
     if config_table.contains_key(module) {
 
@@ -26,7 +26,7 @@ pub fn config_init(module: &[u8]) -> NifResult<Atom> {
 
         match quiche::Config::new(quiche::PROTOCOL_VERSION) {
             Ok(config) => {
-                config_table.insert(module.to_vec(), config);
+                config_table.insert(module.to_vec(), Mutex::new(config));
                 Ok(atoms::ok())
             },
 
@@ -41,11 +41,13 @@ fn set_config<F>(module: Binary, setter: F) -> NifResult<Atom>
     where F: FnOnce(&mut quiche::Config) -> quiche::Result<()> {
 
     let module = module.as_slice();
-    let mut config_table = CONFIGS.lock();
+    let config_table = CONFIGS.read();
 
-    if let Some(c) = config_table.get_mut(module) {
+    if let Some(config) = config_table.get(module) {
 
-        match setter(&mut *c) {
+        let mut config = config.lock();
+
+        match setter(&mut *config) {
             Ok(()) =>
                 Ok(atoms::ok()),
 

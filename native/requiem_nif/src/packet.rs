@@ -2,14 +2,14 @@ use rustler::{Atom, Env, NifResult};
 use rustler::types::binary::{Binary, OwnedBinary};
 
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
+use parking_lot::{RwLock, Mutex};
 
 use std::collections::HashMap;
 
 use crate::common::{self, atoms};
 
-type GlobalBuffer = Mutex<HashMap<Vec<u8>, [u8; 1350]>>;
-static BUFFERS: Lazy<GlobalBuffer> = Lazy::new(|| Mutex::new(HashMap::new()));
+type GlobalBuffer = RwLock<HashMap<Vec<u8>, Mutex<[u8; 1350]>>>;
+static BUFFERS: Lazy<GlobalBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 fn packet_type(ty: quiche::Type) -> Atom {
     match ty {
@@ -24,9 +24,9 @@ fn packet_type(ty: quiche::Type) -> Atom {
 
 
 pub fn buffer_init(module: &[u8]) {
-    let mut buffer_table = BUFFERS.lock();
+    let mut buffer_table = BUFFERS.write();
     if !buffer_table.contains_key(module) {
-        buffer_table.insert(module.to_vec(), [0; 1350]);
+        buffer_table.insert(module.to_vec(), Mutex::new([0; 1350]));
     }
 }
 
@@ -104,9 +104,11 @@ pub fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Bi
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let mut buffer_table = BUFFERS.lock();
+    let buffer_table = BUFFERS.read();
 
-    if let Some(buf) = buffer_table.get_mut(module) {
+    if let Some(buf) = buffer_table.get(module) {
+
+        let mut buf = buf.lock();
 
         let scid = scid.as_slice();
         let dcid = dcid.as_slice();
@@ -133,9 +135,11 @@ pub fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
     -> NifResult<(Atom, Binary<'a>)> {
 
     let module = module.as_slice();
-    let mut buffer_table = BUFFERS.lock();
+    let buffer_table = BUFFERS.read();
 
-    if let Some(buf) = buffer_table.get_mut(module) {
+    if let Some(buf) = buffer_table.get(module) {
+
+        let mut buf = buf.lock();
 
         let scid  = scid.as_slice();
         let odcid = odcid.as_slice();
