@@ -1,6 +1,9 @@
-# [WIP] ReQUIem
+# ReQUIem
 
-QuicTransport (WebTransport over QUIC) framework for Elixir.
+This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
+
+- https://w3c.github.io/webtransport/
+- https://tools.ietf.org/html/draft-vvv-webtransport-quic-02
 
 This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche).
 
@@ -46,4 +49,4 @@ MIT-LICENSE
 
 ## Author
 
-Lyo Kaot <lyo.kato __at__ gmail.com>
+Lyo Kato <lyo.kato __at__ gmail.com>
