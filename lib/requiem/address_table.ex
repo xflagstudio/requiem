@@ -1,22 +1,25 @@
 defmodule Requiem.AddressTable do
+
+  alias Requiem.Address
+
   @spec init(module) :: :ok
   def init(handler) do
     handler |> table_name() |> :ets.new([:set, :public, :named_table])
     :ok
   end
 
-  @spec insert(module, Requiem.Address.t(), binary) :: :ok
+  @spec insert(module, Address.t(), binary) :: :ok
   def insert(handler, address, dcid) do
     handler
     |> table_name()
-    |> :ets.insert({Requiem.Address.to_binary(address), dcid})
+    |> :ets.insert({Address.to_binary(address), dcid})
 
     :ok
   end
 
-  @spec lookup(module, Requiem.Address.t()) :: {:ok, binary} | {:error, :not_found}
+  @spec lookup(module, Address.t()) :: {:ok, binary} | {:error, :not_found}
   def lookup(handler, address) do
-    address_bin = Requiem.Address.to_binary(address)
+    address_bin = Address.to_binary(address)
 
     case handler |> table_name() |> :ets.lookup(address_bin) do
       [] -> {:error, :not_found}
@@ -24,9 +27,9 @@ defmodule Requiem.AddressTable do
     end
   end
 
-  @spec delete(module, Requiem.Address.t()) :: :ok
+  @spec delete(module, Address.t()) :: :ok
   def delete(handler, address) do
-    address_bin = Requiem.Address.to_binary(address)
+    address_bin = Address.to_binary(address)
     handler |> table_name() |> :ets.delete(address_bin)
     :ok
   end

@@ -13,6 +13,8 @@ defmodule Requiem.Supervisor do
   alias Requiem.SenderSupervisor
   alias Requiem.SenderRegistry
   alias Requiem.SenderWorker
+  alias Requiem.Transport.GenUDP
+  alias Requiem.Transport.RustUDP
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
@@ -65,15 +67,15 @@ defmodule Requiem.Supervisor do
 
   defp transport_module(handler) do
     if handler |> Config.get!(:rust_transport) do
-      Requiem.Transport.RustUDP
+      RustUDP
     else
-      Requiem.Transport.GenUDP
+      GenUDP
     end
   end
 
   defp transport_spec(handler) do
     if handler |> Config.get!(:rust_transport) do
-      {Requiem.Transport.RustUDP,
+      {RustUDP,
        [
          handler: handler,
          port: handler |> Config.get!(:port),
@@ -82,7 +84,7 @@ defmodule Requiem.Supervisor do
          polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout)
        ]}
     else
-      {Requiem.Transport.GenUDP,
+      {GenUDP,
        [
          handler: handler,
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
