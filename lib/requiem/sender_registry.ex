@@ -1,4 +1,4 @@
-defmodule Requiem.OutgoingPacket.SenderRegistry do
+defmodule Requiem.SenderRegistry do
   @spec register(module, non_neg_integer) ::
           {:ok, pid()}
           | {:error, {:already_registered, pid()}}

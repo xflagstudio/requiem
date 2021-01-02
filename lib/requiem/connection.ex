@@ -12,7 +12,7 @@ defmodule Requiem.Connection do
   alias Requiem.ConnectionState
   alias Requiem.QUIC
   alias Requiem.Tracer
-  alias Requiem.OutgoingPacket.SenderRegistry
+  alias Requiem.SenderRegistry
 
   @type t :: %__MODULE__{
           handler: module,

@@ -4,8 +4,8 @@ defmodule Requiem.Transport.RustUDP do
   require Requiem.Tracer
 
   alias Requiem.Address
-  alias Requiem.IncomingPacket.DispatcherRegistry
-  alias Requiem.IncomingPacket.DispatcherWorker
+  alias Requiem.DispatcherRegistry
+  alias Requiem.DispatcherWorker
   alias Requiem.QUIC
   alias Requiem.Tracer
 

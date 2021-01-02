@@ -1,7 +1,7 @@
-defmodule Requiem.OutgoingPacket.SenderSupervisor do
+defmodule Requiem.SenderSupervisor do
   use Supervisor
 
-  alias Requiem.OutgoingPacket.SenderWorker
+  alias Requiem.SenderWorker
 
   @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
   def child_spec(opts) do

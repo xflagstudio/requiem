@@ -8,11 +8,11 @@ defmodule Requiem.Supervisor do
   alias Requiem.QUIC
   alias Requiem.ConnectionRegistry
   alias Requiem.ConnectionSupervisor
-  alias Requiem.IncomingPacket.DispatcherSupervisor
-  alias Requiem.IncomingPacket.DispatcherRegistry
-  alias Requiem.OutgoingPacket.SenderSupervisor
-  alias Requiem.OutgoingPacket.SenderRegistry
-  alias Requiem.OutgoingPacket.SenderWorker
+  alias Requiem.DispatcherSupervisor
+  alias Requiem.DispatcherRegistry
+  alias Requiem.SenderSupervisor
+  alias Requiem.SenderRegistry
+  alias Requiem.SenderWorker
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do

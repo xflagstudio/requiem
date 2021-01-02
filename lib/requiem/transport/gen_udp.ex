@@ -6,8 +6,8 @@ defmodule Requiem.Transport.GenUDP do
   use Bitwise
 
   alias Requiem.Address
-  alias Requiem.IncomingPacket.DispatcherRegistry
-  alias Requiem.IncomingPacket.DispatcherWorker
+  alias Requiem.DispatcherRegistry
+  alias Requiem.DispatcherWorker
   alias Requiem.Tracer
 
   @max_quic_packet_size 1350

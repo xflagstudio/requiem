@@ -1,8 +1,8 @@
-defmodule Requiem.OutgoingPacket.SenderWorker do
+defmodule Requiem.SenderWorker do
   use GenServer
 
   alias Requiem.Address
-  alias Requiem.OutgoingPacket.SenderRegistry
+  alias Requiem.SenderRegistry
 
   @type t :: %__MODULE__{
           handler: module,

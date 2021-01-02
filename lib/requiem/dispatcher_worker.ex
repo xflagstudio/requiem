@@ -1,4 +1,4 @@
-defmodule Requiem.IncomingPacket.DispatcherWorker do
+defmodule Requiem.DispatcherWorker do
   require Logger
   require Requiem.Tracer
   use GenServer
@@ -7,8 +7,8 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   alias Requiem.Connection
   alias Requiem.ConnectionID
   alias Requiem.ConnectionSupervisor
-  alias Requiem.IncomingPacket.DispatcherRegistry
-  alias Requiem.OutgoingPacket.SenderRegistry
+  alias Requiem.DispatcherRegistry
+  alias Requiem.SenderRegistry
   alias Requiem.QUIC
   alias Requiem.RetryToken
   alias Requiem.Tracer
@@ -95,7 +95,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       {:error, reason} ->
         if state.trace do
           Logger.debug(
-            "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> bad formatted packet: #{
+            "<Requiem.DispatcherWorker:#{inspect(self())}> bad formatted packet: #{
               inspect(reason)
             }"
           )
@@ -130,7 +130,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         sender.send(pid, address, packet)
 
       {:error, :not_found} ->
-        Logger.error("<Requiem.IncomingDispatcher> failed to send, sender-process not found")
+        Logger.error("<Requiem.DispatcherWorker> failed to send, sender-process not found")
         {:error, :not_found}
     end
   end

@@ -1,7 +1,7 @@
-defmodule Requiem.IncomingPacket.DispatcherSupervisor do
+defmodule Requiem.DispatcherSupervisor do
   use Supervisor
 
-  alias Requiem.IncomingPacket.DispatcherWorker
+  alias Requiem.DispatcherWorker
 
   @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
   def child_spec(opts) do
