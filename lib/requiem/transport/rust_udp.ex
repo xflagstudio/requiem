@@ -4,12 +4,15 @@ defmodule Requiem.Transport.RustUDP do
   require Requiem.Tracer
 
   alias Requiem.Address
+  alias Requiem.IncomingPacket.DispatcherRegistry
+  alias Requiem.IncomingPacket.DispatcherWorker
   alias Requiem.QUIC
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
-          dispatcher: module,
+          number_of_dispatchers: non_neg_integer,
+          dispatcher_index: non_neg_integer,
           port: non_neg_integer,
           event_capacity: non_neg_integer,
           polling_timeout: non_neg_integer,
@@ -17,7 +20,8 @@ defmodule Requiem.Transport.RustUDP do
         }
 
   defstruct handler: nil,
-            dispatcher: nil,
+            number_of_dispatchers: 0,
+            dispatcher_index: 0,
             port: 0,
             event_capacity: 0,
             polling_timeout: 0,
@@ -105,8 +109,15 @@ defmodule Requiem.Transport.RustUDP do
         Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
       end
 
-    state.dispatcher.dispatch(state.handler, address, data)
-    {:noreply, state}
+    case find_dispatcher(state, 0) do
+      {:ok, pid, new_state} ->
+        DispatcherWorker.dispatch(pid, address, data)
+        {:noreply, new_state}
+
+      {:error, :not_found} ->
+        Logger.error("<Requiem.Transport.RustUDP> can't find dispatcher process")
+        {:noreply, state}
+    end
   end
 
   def handle_info({:socket_error, reason}, state) do
@@ -123,12 +134,35 @@ defmodule Requiem.Transport.RustUDP do
   defp new(opts) do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
-      dispatcher: Keyword.fetch!(opts, :dispatcher),
+      number_of_dispatchers: Keyword.fetch!(opts, :number_of_dispatchers),
+      dispatcher_index: 0,
       port: Keyword.fetch!(opts, :port),
       event_capacity: Keyword.get(opts, :event_capacity, 1024),
       polling_timeout: Keyword.get(opts, :polling_timeout, 10),
       sock: nil
     }
+  end
+
+  defp find_dispatcher(state, retry_count) when retry_count < 3 do
+    case DispatcherRegistry.lookup(state.handler, state.dispatcher_index) do
+      {:ok, pid} ->
+        {:ok, pid, update_dispatcher_index(state)}
+
+      {:error, :not_found} ->
+        state |> update_dispatcher_index() |> find_dispatcher(retry_count + 1)
+    end
+  end
+
+  defp find_dispatcher(_state, _retry_count) do
+    {:error, :not_found}
+  end
+
+  defp update_dispatcher_index(state) do
+    if state.dispatcher_index >= state.number_of_dispatchers - 1 do
+      %{state | dispatcher_index: 0}
+    else
+      %{state | dispatcher_index: state.dispatcher_index + 1}
+    end
   end
 
   defp send_packet(sock, address, packet) do

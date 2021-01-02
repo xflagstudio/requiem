@@ -7,6 +7,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   alias Requiem.Connection
   alias Requiem.ConnectionID
   alias Requiem.ConnectionSupervisor
+  alias Requiem.IncomingPacket.DispatcherRegistry
   alias Requiem.QUIC
   alias Requiem.RetryToken
   alias Requiem.Tracer
@@ -16,6 +17,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
           transport: module,
           token_secret: binary,
           conn_id_secret: binary,
+          worker_index: non_neg_integer,
           buffer: term,
           trace_id: binary
         }
@@ -24,36 +26,57 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
             transport: nil,
             token_secret: "",
             conn_id_secret: "",
+            worker_index: 0,
             buffer: nil,
             trace_id: ""
 
-  @spec dispatch(pid, Address.t(), iodata()) ::
-          :ok | {:error, :timeout}
+  @spec child_spec(Keyword.t()) :: map
+  def child_spec(opts) do
+    handler = Keyword.fetch!(opts, :handler)
+    index = Keyword.fetch!(opts, :worker_index)
+
+    %{
+      id: name(handler, index),
+      start: {__MODULE__, :start_link, [opts]},
+      shutdown: 5_000,
+      restart: :permanent,
+      type: :worker
+    }
+  end
+
+  @spec dispatch(pid, Address.t(), iodata()) :: :ok
   def dispatch(pid, address, packet) do
-    try do
-      GenServer.call(pid, {:packet, address, packet}, 100)
-      :ok
-    catch
-      :exit, _ ->
-        Tracer.trace(__MODULE__, "dispatch: failed")
-        {:error, :timeout}
-    end
+    GenServer.cast(pid, {:packet, address, packet})
   end
 
   @spec start_link(Keyword.t()) :: GenServer.on_start()
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
+    handler = Keyword.fetch!(opts, :handler)
+    index = Keyword.fetch!(opts, :worker_index)
+    GenServer.start_link(__MODULE__, opts, name: name(handler, index))
   end
 
   @impl GenServer
   def init(opts) do
     state = new(opts)
-    {:ok, buffer} = QUIC.Packet.create_buffer()
-    {:ok, %{state | buffer: buffer}}
+
+    Process.flag(:trap_exit, true)
+
+    case DispatcherRegistry.register(
+           state.handler,
+           state.worker_index
+         ) do
+      {:ok, _pid} ->
+        {:ok, buffer} = QUIC.Packet.create_buffer()
+        {:ok, %{state | buffer: buffer}}
+
+      {:error, {:already_registered, _pid}} ->
+        {:stop, :normal}
+    end
   end
 
   @impl GenServer
-  def handle_call({:packet, address, packet}, _from, state) do
+  def handle_cast({:packet, address, packet}, state) do
     case QUIC.Packet.parse_header(packet) do
       {:ok, scid, dcid, _token, _version, :initial, false} ->
         Tracer.trace(__MODULE__, state.trace_id, "@unsupported_version")
@@ -79,22 +102,19 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         :ok
     end
 
-    {:reply, :ok, state}
+    {:noreply, state}
   end
 
-  def handle_call(_ev, _from, state) do
-    if state.trace do
-      Logger.info(
-        "<Requiem.IncomingPacket.DispatcherWorker:#{inspect(self())}> unknown handle_call pattern"
-      )
-    end
-
-    {:reply, :ok, state}
+  @impl GenServer
+  def terminate(_reason, state) do
+    DispatcherRegistry.unregister(state.handler, state.worker_index)
+    :ok
   end
 
   defp new(opts) do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
+      worker_index: Keyword.fetch!(opts, :worker_index),
       transport: Keyword.fetch!(opts, :transport),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
@@ -208,4 +228,6 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
       odcid
     )
   end
+
+  defp name(handler, index), do: Module.concat([handler, __MODULE__, "Worker_#{index}"])
 end
