@@ -18,6 +18,7 @@ defmodule Requiem.Transport.RustUDP do
           number_of_dispatchers: non_neg_integer,
           dispatcher_index: non_neg_integer,
           port: non_neg_integer,
+          host: binary,
           event_capacity: non_neg_integer,
           polling_timeout: non_neg_integer,
           sock: port
@@ -27,6 +28,7 @@ defmodule Requiem.Transport.RustUDP do
             number_of_dispatchers: 0,
             dispatcher_index: 0,
             port: 0,
+            host: "",
             event_capacity: 0,
             polling_timeout: 0,
             sock: nil
@@ -49,7 +51,7 @@ defmodule Requiem.Transport.RustUDP do
     state = new(opts)
 
     case QUIC.Socket.open(
-           "0.0.0.0",
+           state.host,
            state.port,
            self(),
            state.event_capacity,
@@ -141,6 +143,7 @@ defmodule Requiem.Transport.RustUDP do
       number_of_dispatchers: Keyword.fetch!(opts, :number_of_dispatchers),
       dispatcher_index: 0,
       port: Keyword.fetch!(opts, :port),
+      host: Keyword.fetch!(opts, :host),
       event_capacity: Keyword.get(opts, :event_capacity, 1024),
       polling_timeout: Keyword.get(opts, :polling_timeout, 10),
       sock: nil

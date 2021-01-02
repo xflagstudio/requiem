@@ -13,6 +13,7 @@ defmodule Requiem.Config do
           | :stream_buffer_pool_size
           | :stream_buffer_size
           | :rust_transport
+          | :rust_transport_host
           | :rust_transport_event_capacity
           | :rust_transport_polling_timeout
           | :token_secret
@@ -55,6 +56,7 @@ defmodule Requiem.Config do
     dgram_queue_size: 1000,
     max_idle_timeout: 60_000,
     rust_transport: false,
+    rust_transport_host: "0.0.0.0",
     rust_transport_event_capacity: 1024,
     rust_transport_polling_timeout: 10
   ]
@@ -69,6 +71,7 @@ defmodule Requiem.Config do
     stream_buffer_pool_size: true,
     stream_buffer_size: true,
     rust_transport: true,
+    rust_transport_host: true,
     rust_transport_event_capacity: true,
     rust_transport_polling_timeout: true,
     token_secret: true,

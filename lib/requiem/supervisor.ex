@@ -81,6 +81,7 @@ defmodule Requiem.Supervisor do
          port: handler |> Config.get!(:port),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
          event_capacity: handler |> Config.get!(:rust_transport_event_capacity),
+         host: handler |> Config.get!(:rust_transport_host),
          polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout)
        ]}
     else
