@@ -16,6 +16,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
           transport: module,
           token_secret: binary,
           conn_id_secret: binary,
+    buffer: term,
           trace_id: binary
         }
 
@@ -23,6 +24,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
             transport: nil,
             token_secret: "",
             conn_id_secret: "",
+  buffer: nil,
             trace_id: ""
 
   @spec dispatch(pid, Address.t(), iodata()) ::
@@ -45,7 +47,9 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
   @impl GenServer
   def init(opts) do
-    {:ok, new(opts)}
+    state = new(opts)
+    {:ok, buffer} = QUIC.Packet.create_buffer()
+    {:ok, %{state| buffer: buffer}}
   end
 
   @impl GenServer
@@ -115,7 +119,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   end
 
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
-    case QUIC.Packet.build_negotiate_version(state.handler, scid, dcid) do
+    case QUIC.Packet.build_negotiate_version(state.buffer, scid, dcid) do
       {:ok, resp} ->
         state.transport.send(state.handler, address, resp)
         :ok
@@ -131,7 +135,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
          {:ok, token} <-
            RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
-           QUIC.Packet.build_retry(state.handler, scid, dcid, new_id, token, version) do
+           QUIC.Packet.build_retry(state.buffer, scid, dcid, new_id, token, version) do
       Tracer.trace(__MODULE__, state.trace_id, "@send")
       state.transport.send(state.handler, address, resp)
       :ok

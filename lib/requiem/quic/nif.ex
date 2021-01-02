@@ -1,9 +1,9 @@
 defmodule Requiem.QUIC.NIF do
   use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
-  @spec quic_init(binary, non_neg_integer, non_neg_integer, non_neg_integer) ::
+  @spec quic_init(binary, non_neg_integer, non_neg_integer) ::
           :ok | {:error, :system_error}
-  def quic_init(_module, _retry_buffer_num, _stream_buffer_num, _stream_buffer_size), do: error()
+  def quic_init(_module, _stream_buffer_num, _stream_buffer_size), do: error()
 
   @spec config_load_cert_chain_from_pem_file(binary, binary) ::
           :ok | {:error, :system_error | :not_found}
@@ -120,13 +120,17 @@ defmodule Requiem.QUIC.NIF do
           | {:error, :system_error | :bad_format}
   def packet_parse_header(_packet), do: error()
 
-  @spec packet_build_negotiate_version(binary, binary, binary) ::
-          {:ok, binary} | {:error, :system_error}
-  def packet_build_negotiate_version(_module, _scid, _dcid), do: error()
+  @spec packet_build_buffer_create() ::
+          {:ok, term} | {:error, :system_error}
+  def packet_build_buffer_create(), do: error()
 
-  @spec packet_build_retry(binary, binary, binary, binary, binary, non_neg_integer) ::
+  @spec packet_build_negotiate_version(term, binary, binary) ::
           {:ok, binary} | {:error, :system_error}
-  def packet_build_retry(_module, _scid, _dcid, _new_scid, _token, _version), do: error()
+  def packet_build_negotiate_version(_buffer, _scid, _dcid), do: error()
+
+  @spec packet_build_retry(term, binary, binary, binary, binary, non_neg_integer) ::
+          {:ok, binary} | {:error, :system_error}
+  def packet_build_retry(_buffer, _scid, _dcid, _new_scid, _token, _version), do: error()
 
   @spec socket_open(binary, pid, non_neg_integer, non_neg_integer) ::
           {:ok, term} | {:error, :system_error}

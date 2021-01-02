@@ -9,15 +9,10 @@ mod socket;
 
 #[rustler::nif]
 fn quic_init(module: Binary,
-    retry_buffer_num: u64,
     stream_buffer_num: u64,
     stream_buffer_size: usize,
     ) -> NifResult<Atom> {
     let module  = module.as_slice();
-    packet::buffer_init(
-        &module,
-        retry_buffer_num,
-    );
     connection::buffer_init(
         &module,
         stream_buffer_num,
@@ -53,6 +48,7 @@ rustler::init!(
         config::config_enable_hystart,
         config::config_enable_dgram,
 
+        packet::packet_build_buffer_create,
         packet::packet_parse_header,
         packet::packet_build_negotiate_version,
         packet::packet_build_retry,
@@ -74,6 +70,7 @@ rustler::init!(
 
 fn load(env: Env, _: Term) -> bool {
     connection::on_load(env);
+    packet::on_load(env);
     socket::on_load(env);
     true
 }

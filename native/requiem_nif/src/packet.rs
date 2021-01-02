@@ -1,18 +1,22 @@
-use rustler::{Atom, Env, NifResult};
+use rustler::{Atom, Env, NifResult, ResourceArc};
 use rustler::types::binary::{Binary, OwnedBinary};
 
-use once_cell::sync::Lazy;
-use parking_lot::{RwLock, Mutex};
-
-use std::collections::HashMap;
+use parking_lot::Mutex;
 
 use crate::common::{self, atoms};
 
-type ModuleName = Vec<u8>;
-type BufferSlot = Vec<Mutex<[u8; 1350]>>;
-type PacketBuilderBuffer = RwLock<HashMap<ModuleName, BufferSlot>>;
+pub struct PacketBuildBuffer {
+    buf: Mutex<[u8; 1350]>,
+}
 
-static PACKET_BUILDER_BUFFERS: Lazy<PacketBuilderBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
+impl PacketBuildBuffer {
+
+    pub fn new() -> Self {
+        PacketBuildBuffer {
+            buf: Mutex::new([0; 1350]),
+        }
+    }
+}
 
 fn packet_type(ty: quiche::Type) -> Atom {
     match ty {
@@ -22,18 +26,6 @@ fn packet_type(ty: quiche::Type) -> Atom {
         quiche::Type::Retry              => atoms::retry(),
         quiche::Type::Handshake          => atoms::handshake(),
         quiche::Type::ZeroRTT            => atoms::zero_rtt()
-    }
-}
-
-pub fn buffer_init(module: &[u8], num: u64) {
-    let mut buffer_table = PACKET_BUILDER_BUFFERS.write();
-    if !buffer_table.contains_key(module) {
-        let mut slot = Vec::new();
-        for _ in 0..num {
-            slot.push(Mutex::new([0; 1350]));
-        }
-
-        buffer_table.insert(module.to_vec(), slot);
     }
 }
 
@@ -63,6 +55,12 @@ fn header_scid_binary(hdr: &quiche::Header) -> NifResult<OwnedBinary> {
     let mut scid = OwnedBinary::new(hdr.scid.len()).unwrap();
     scid.as_mut_slice().copy_from_slice(hdr.scid.as_ref());
     Ok(scid)
+}
+
+#[rustler::nif]
+pub fn packet_build_buffer_create()
+    -> NifResult<(Atom, ResourceArc<PacketBuildBuffer>)> {
+    Ok((atoms::ok(), ResourceArc::new(PacketBuildBuffer::new())))
 }
 
 #[rustler::nif]
@@ -106,71 +104,52 @@ pub fn packet_parse_header<'a>(env: Env<'a>, packet: Binary)
 }
 
 #[rustler::nif]
-pub fn packet_build_negotiate_version<'a>(env: Env<'a>, module: Binary, scid: Binary, dcid: Binary)
+pub fn packet_build_negotiate_version<'a>(env: Env<'a>,
+    buffer: ResourceArc<PacketBuildBuffer>, scid: Binary, dcid: Binary)
     -> NifResult<(Atom, Binary<'a>)> {
 
-    let module = module.as_slice();
-    let buffer_table = PACKET_BUILDER_BUFFERS.read();
+    let mut buf = buffer.buf.lock();
 
-    if let Some(buf) = buffer_table.get(module) {
+    let scid = scid.as_slice();
+    let dcid = dcid.as_slice();
 
-        let mut buf = buf[common::random_slot_index(buf.len())].lock();
+    let len = quiche::negotiate_version(&scid, &dcid, &mut *buf).unwrap();
 
-        let scid = scid.as_slice();
-        let dcid = dcid.as_slice();
+    let mut resp = OwnedBinary::new(len).unwrap();
+    resp.as_mut_slice().copy_from_slice(&buf[..len]);
 
-        let len = quiche::negotiate_version(&scid, &dcid, &mut *buf).unwrap();
-
-        let mut resp = OwnedBinary::new(len).unwrap();
-        resp.as_mut_slice().copy_from_slice(&buf[..len]);
-
-        Ok((atoms::ok(), resp.release(env)))
-
-    } else {
-
-        Err(common::error_term(atoms::not_found()))
-
-    }
-
+    Ok((atoms::ok(), resp.release(env)))
 }
 
 #[rustler::nif]
-pub fn packet_build_retry<'a>(env: Env<'a>, module: Binary,
-    scid: Binary, odcid: Binary, dcid: Binary,
+pub fn packet_build_retry<'a>(env: Env<'a>,
+    buffer: ResourceArc<PacketBuildBuffer>, scid: Binary, odcid: Binary, dcid: Binary,
     token: Binary, version: u32)
     -> NifResult<(Atom, Binary<'a>)> {
 
-    let module = module.as_slice();
-    let buffer_table = PACKET_BUILDER_BUFFERS.read();
+    let mut buf = buffer.buf.lock();
 
-    if let Some(buf) = buffer_table.get(module) {
+    let scid  = scid.as_slice();
+    let odcid = odcid.as_slice();
+    let dcid  = dcid.as_slice();
+    let token = token.as_slice();
 
-        let mut buf = buf[common::random_slot_index(buf.len())].lock();
+    let len = quiche::retry(
+        &scid,
+        &odcid,
+        &dcid,
+        &token,
+        version,
+        &mut *buf,
+    ).unwrap();
 
-        let scid  = scid.as_slice();
-        let odcid = odcid.as_slice();
-        let dcid  = dcid.as_slice();
-        let token = token.as_slice();
+    let mut resp = OwnedBinary::new(len).unwrap();
+    resp.as_mut_slice().copy_from_slice(&buf[..len]);
 
-        let len = quiche::retry(
-            &scid,
-            &odcid,
-            &dcid,
-            &token,
-            version,
-            &mut *buf,
-        ).unwrap();
-
-        let mut resp = OwnedBinary::new(len).unwrap();
-        resp.as_mut_slice().copy_from_slice(&buf[..len]);
-
-        Ok((atoms::ok(), resp.release(env)))
-
-    } else {
-
-        Err(common::error_term(atoms::not_found()))
-
-    }
-
+    Ok((atoms::ok(), resp.release(env)))
 }
 
+pub fn on_load(env: Env) -> bool {
+    rustler::resource!(PacketBuildBuffer, env);
+    true
+}
