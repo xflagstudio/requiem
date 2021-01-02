@@ -1,4 +1,8 @@
 defmodule Requiem.Transport.RustUDP do
+  @moduledoc """
+  This is an experimental module that aims to achieve high UDP throughput by using NIF.
+  """
+
   use GenServer
   require Logger
   require Requiem.Tracer

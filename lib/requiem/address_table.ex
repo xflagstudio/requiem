@@ -1,5 +1,4 @@
 defmodule Requiem.AddressTable do
-
   alias Requiem.Address
 
   @spec init(module) :: :ok

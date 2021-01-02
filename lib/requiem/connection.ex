@@ -19,6 +19,7 @@ defmodule Requiem.Connection do
           handler_state: any,
           handler_initialized: boolean,
           sender: {module, non_neg_integer},
+          sender_pid: pid,
           trace_id: binary,
           web_transport: boolean,
           conn_state: ConnectionState.t(),
@@ -30,6 +31,7 @@ defmodule Requiem.Connection do
             handler_state: nil,
             handler_initialized: true,
             sender: nil,
+            sender_pid: nil,
             trace_id: nil,
             web_transport: true,
             conn_state: nil,
@@ -53,26 +55,35 @@ defmodule Requiem.Connection do
     state = new(opts)
     Tracer.trace(__MODULE__, state.trace_id, "@init")
 
-    Process.flag(:trap_exit, true)
+    {_sender_module, sender_num} = state.sender
 
-    case ConnectionRegistry.register(
-           state.handler,
-           state.conn_state.dcid
-         ) do
-      {:ok, _pid} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
+    case SenderRegistry.lookup(state.handler, :rand.uniform(sender_num) - 1) do
+      {:ok, sender_pid} ->
+        Process.flag(:trap_exit, true)
 
-        AddressTable.insert(
-          state.handler,
-          state.conn_state.address,
-          state.conn_state.dcid
-        )
+        case ConnectionRegistry.register(
+               state.handler,
+               state.conn_state.dcid
+             ) do
+          {:ok, _pid} ->
+            Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
 
-        send(self(), :__accept__)
-        {:ok, state}
+            AddressTable.insert(
+              state.handler,
+              state.conn_state.address,
+              state.conn_state.dcid
+            )
 
-      {:error, {:already_registered, _pid}} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
+            send(self(), :__accept__)
+            {:ok, %{state | sender_pid: sender_pid}}
+
+          {:error, {:already_registered, _pid}} ->
+            Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
+            {:stop, :normal}
+        end
+
+      {:error, :not_found} ->
+        Logger.error("<Requiem.Connection:#{state.trace_id}> sender-process not found")
         {:stop, :normal}
     end
   end
@@ -468,21 +479,9 @@ defmodule Requiem.Connection do
     end
   end
 
-  def handle_info({:__drain__, data}, state) do
+  def handle_info({:__drain__, data}, %__MODULE__{sender: {sender, _num}} = state) do
     Tracer.trace(__MODULE__, state.trace_id, "@drain")
-
-    {sender, num} = state.sender
-
-    case SenderRegistry.lookup(state.handler, :rand.uniform(num) - 1) do
-      {:ok, pid} ->
-        sender.send(pid, state.conn_state.address, data)
-
-      {:error, :not_found} ->
-        Logger.error(
-          "<Requiem.Connection:#{state.trace_id}> failed to send, sender-process not found"
-        )
-    end
-
+    sender.send(state.sender_pid, state.conn_state.address, data)
     {:noreply, state}
   end
 
