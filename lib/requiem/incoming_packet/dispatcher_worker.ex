@@ -16,7 +16,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
           transport: module,
           token_secret: binary,
           conn_id_secret: binary,
-    buffer: term,
+          buffer: term,
           trace_id: binary
         }
 
@@ -24,7 +24,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
             transport: nil,
             token_secret: "",
             conn_id_secret: "",
-  buffer: nil,
+            buffer: nil,
             trace_id: ""
 
   @spec dispatch(pid, Address.t(), iodata()) ::
@@ -49,7 +49,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   def init(opts) do
     state = new(opts)
     {:ok, buffer} = QUIC.Packet.create_buffer()
-    {:ok, %{state| buffer: buffer}}
+    {:ok, %{state | buffer: buffer}}
   end
 
   @impl GenServer
