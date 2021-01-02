@@ -46,4 +46,4 @@ MIT-LICENSE
 
 ## Author
 
-Lyo Kaot <lyo.kato __at__ gmail.com>
+Lyo Kato <lyo.kato __at__ gmail.com>
