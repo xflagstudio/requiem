@@ -2,6 +2,9 @@
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
 
+- https://w3c.github.io/webtransport/
+- https://tools.ietf.org/html/draft-vvv-webtransport-quic-02
+
 This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche).
 
 **quiche** is written in **Rust**, so you need to prepare Rust compiler to build this library.
