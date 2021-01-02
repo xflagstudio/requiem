@@ -1,5 +1,5 @@
-use rustler::{Atom, Env, NifResult, Term};
 use rustler::types::binary::Binary;
+use rustler::{Atom, Env, NifResult, Term};
 
 mod common;
 mod config;
@@ -8,16 +8,9 @@ mod packet;
 mod socket;
 
 #[rustler::nif]
-fn quic_init(module: Binary,
-    stream_buffer_num: u64,
-    stream_buffer_size: usize,
-    ) -> NifResult<Atom> {
-    let module  = module.as_slice();
-    connection::buffer_init(
-        &module,
-        stream_buffer_num,
-        stream_buffer_size,
-    );
+fn quic_init(module: Binary, stream_buffer_num: u64, stream_buffer_size: usize) -> NifResult<Atom> {
+    let module = module.as_slice();
+    connection::buffer_init(&module, stream_buffer_num, stream_buffer_size);
     config::config_init(&module)
 }
 
@@ -47,12 +40,10 @@ rustler::init!(
         config::config_set_cc_algorithm_name,
         config::config_enable_hystart,
         config::config_enable_dgram,
-
         packet::packet_build_buffer_create,
         packet::packet_parse_header,
         packet::packet_build_negotiate_version,
         packet::packet_build_retry,
-
         connection::connection_accept,
         connection::connection_close,
         connection::connection_is_closed,
@@ -60,7 +51,6 @@ rustler::init!(
         connection::connection_on_timeout,
         connection::connection_stream_send,
         connection::connection_dgram_send,
-
         socket::socket_open,
         socket::socket_send,
         socket::socket_address_parts,
@@ -74,4 +64,3 @@ fn load(env: Env, _: Term) -> bool {
     socket::on_load(env);
     true
 }
-

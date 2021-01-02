@@ -1,12 +1,12 @@
-use rustler::{Atom, NifResult};
 use rustler::types::binary::Binary;
+use rustler::{Atom, NifResult};
 
 use once_cell::sync::Lazy;
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{Mutex, RwLock};
 
-use std::str;
-use std::convert::TryInto;
 use std::collections::HashMap;
+use std::convert::TryInto;
+use std::str;
 
 use crate::common::{self, atoms};
 
@@ -16,50 +16,39 @@ type SyncConfig = RwLock<HashMap<ModuleName, Mutex<quiche::Config>>>;
 pub(crate) static CONFIGS: Lazy<SyncConfig> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn config_init(module: &[u8]) -> NifResult<Atom> {
-
     let mut config_table = CONFIGS.write();
 
     if config_table.contains_key(module) {
-
         Ok(atoms::ok())
-
     } else {
-
         match quiche::Config::new(quiche::PROTOCOL_VERSION) {
             Ok(config) => {
                 config_table.insert(module.to_vec(), Mutex::new(config));
                 Ok(atoms::ok())
-            },
+            }
 
-            Err(_) =>
-                Err(common::error_term(atoms::system_error()))
+            Err(_) => Err(common::error_term(atoms::system_error())),
         }
-
     }
 }
 
 fn set_config<F>(module: Binary, setter: F) -> NifResult<Atom>
-    where F: FnOnce(&mut quiche::Config) -> quiche::Result<()> {
-
+where
+    F: FnOnce(&mut quiche::Config) -> quiche::Result<()>,
+{
     let module = module.as_slice();
     let config_table = CONFIGS.read();
 
     if let Some(config) = config_table.get(module) {
-
         let mut config = config.lock();
 
         match setter(&mut *config) {
-            Ok(()) =>
-                Ok(atoms::ok()),
+            Ok(()) => Ok(atoms::ok()),
 
-            Err(_) =>
-                Err(common::error_term(atoms::system_error()))
+            Err(_) => Err(common::error_term(atoms::system_error())),
         }
-
     } else {
-
         Err(common::error_term(atoms::not_found()))
-
     }
 }
 
@@ -78,13 +67,17 @@ pub fn config_load_priv_key_from_pem_file(module: Binary, file: Binary) -> NifRe
 #[rustler::nif]
 pub fn config_load_verify_locations_from_file(module: Binary, file: Binary) -> NifResult<Atom> {
     let file = str::from_utf8(file.as_slice()).unwrap();
-    set_config(module, |config| config.load_verify_locations_from_file(file))
+    set_config(module, |config| {
+        config.load_verify_locations_from_file(file)
+    })
 }
 
 #[rustler::nif]
 pub fn config_load_verify_locations_from_directory(module: Binary, dir: Binary) -> NifResult<Atom> {
     let dir = str::from_utf8(dir.as_slice()).unwrap();
-    set_config(module, |config| config.load_verify_locations_from_directory(dir))
+    set_config(module, |config| {
+        config.load_verify_locations_from_directory(dir)
+    })
 }
 
 #[rustler::nif]
@@ -113,7 +106,9 @@ pub fn config_enable_early_data(module: Binary) -> NifResult<Atom> {
 
 #[rustler::nif]
 pub fn config_set_application_protos(module: Binary, protos: Binary) -> NifResult<Atom> {
-    set_config(module, |config| config.set_application_protos(protos.as_slice()))
+    set_config(module, |config| {
+        config.set_application_protos(protos.as_slice())
+    })
 }
 
 #[rustler::nif]
@@ -219,9 +214,12 @@ pub fn config_enable_hystart(module: Binary, enabled: bool) -> NifResult<Atom> {
 }
 
 #[rustler::nif]
-pub fn config_enable_dgram(module: Binary, enabled: bool, recv_queue_len: u64, send_queue_len: u64)
-    -> NifResult<Atom> {
-
+pub fn config_enable_dgram(
+    module: Binary,
+    enabled: bool,
+    recv_queue_len: u64,
+    send_queue_len: u64,
+) -> NifResult<Atom> {
     let recv: usize = recv_queue_len.try_into().unwrap();
     let send: usize = send_queue_len.try_into().unwrap();
 
@@ -230,4 +228,3 @@ pub fn config_enable_dgram(module: Binary, enabled: bool, recv_queue_len: u64, s
         Ok(())
     })
 }
-

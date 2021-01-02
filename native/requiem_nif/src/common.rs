@@ -1,5 +1,5 @@
+use ring::rand::{SecureRandom, SystemRandom};
 use rustler::Atom;
-use ring::rand::{SystemRandom, SecureRandom};
 use std::convert::TryInto;
 
 pub(crate) mod atoms {
@@ -29,14 +29,14 @@ pub(crate) fn error_term(reason: Atom) -> rustler::Error {
     rustler::Error::Term(Box::new(reason))
 }
 
-pub (crate) fn random() -> u64 {
+pub(crate) fn random() -> u64 {
     let mut data = [0; 8];
     let rand = SystemRandom::new();
     rand.fill(&mut data).unwrap();
     u64::from_be_bytes(data)
 }
 
-pub (crate) fn random_slot_index(size: usize) -> usize {
+pub(crate) fn random_slot_index(size: usize) -> usize {
     let r: usize = random().try_into().unwrap();
     r % size
 }
