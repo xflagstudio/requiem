@@ -29,8 +29,8 @@ defmodule Requiem.Supervisor do
 
   @impl Supervisor
   def init([handler, otp_app]) do
-    handler |> QUIC.init(5)
-    handler |> Config.setup(otp_app)
+    handler |> Config.init(otp_app)
+    handler |> QUIC.setup()
     handler |> AddressTable.init()
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
