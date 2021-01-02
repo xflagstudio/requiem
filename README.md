@@ -2,12 +2,14 @@
 
 QuicTransport (WebTransport over QUIC) framework for Elixir.
 
-This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche) for QUIC protocol part.
+This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche).
 
 Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
 (it also accepts **draft-27** or **draft-28** QUIC frames)
 
-And **quiche** is written in **Rust**, so you need to prepare Rust compiler to build this library.
+ **quiche** is written in **Rust**, so you need to prepare Rust compiler to build this library.
+
+And this library requires [Rustler](https://github.com/rusterlium/rustler) to bridge between elixir and rust.
 
 ## Installation
 
