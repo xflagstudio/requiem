@@ -12,12 +12,13 @@ defmodule Requiem.Connection do
   alias Requiem.ConnectionState
   alias Requiem.QUIC
   alias Requiem.Tracer
+  alias Requiem.OutgoingPacket.SenderRegistry
 
   @type t :: %__MODULE__{
           handler: module,
           handler_state: any,
           handler_initialized: boolean,
-          transport: module,
+          sender: {module, non_neg_integer},
           trace_id: binary,
           web_transport: boolean,
           conn_state: ConnectionState.t(),
@@ -28,7 +29,7 @@ defmodule Requiem.Connection do
   defstruct handler: nil,
             handler_state: nil,
             handler_initialized: true,
-            transport: nil,
+            sender: nil,
             trace_id: nil,
             web_transport: true,
             conn_state: nil,
@@ -470,11 +471,17 @@ defmodule Requiem.Connection do
   def handle_info({:__drain__, data}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@drain")
 
-    state.transport.send(
-      state.handler,
-      state.conn_state.address,
-      data
-    )
+    {sender, num} = state.sender
+
+    case SenderRegistry.lookup(state.handler, :rand.uniform(num) - 1) do
+      {:ok, pid} ->
+        sender.send(pid, state.conn_state.address, data)
+
+      {:error, :not_found} ->
+        Logger.error(
+          "<Requiem.Connection:#{state.trace_id}> failed to send, sender-process not found"
+        )
+    end
 
     {:noreply, state}
   end
@@ -688,7 +695,7 @@ defmodule Requiem.Connection do
       handler: Keyword.fetch!(opts, :handler),
       handler_state: nil,
       handler_initialized: false,
-      transport: Keyword.fetch!(opts, :transport),
+      sender: Keyword.fetch!(opts, :sender),
       trace_id: trace_id,
       web_transport: Keyword.get(opts, :web_transport, true),
       conn_state: ConnectionState.new(address, dcid, scid, odcid),

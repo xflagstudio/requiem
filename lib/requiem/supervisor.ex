@@ -8,9 +8,11 @@ defmodule Requiem.Supervisor do
   alias Requiem.QUIC
   alias Requiem.ConnectionRegistry
   alias Requiem.ConnectionSupervisor
-  alias Requiem.OutgoingPacket.SenderPool
   alias Requiem.IncomingPacket.DispatcherSupervisor
   alias Requiem.IncomingPacket.DispatcherRegistry
+  alias Requiem.OutgoingPacket.SenderSupervisor
+  alias Requiem.OutgoingPacket.SenderRegistry
+  alias Requiem.OutgoingPacket.SenderWorker
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
@@ -40,19 +42,19 @@ defmodule Requiem.Supervisor do
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
       {Registry, keys: :unique, name: DispatcherRegistry.name(handler)},
+      {Registry, keys: :unique, name: SenderRegistry.name(handler)},
       {ConnectionSupervisor, handler},
-      {SenderPool,
+      {SenderSupervisor,
        [
          handler: handler,
          transport: handler |> transport_module(),
          buffering_interval: handler |> Config.get!(:sender_buffering_interval),
-         pool_size: handler |> Config.get!(:sender_pool_size),
-         pool_max_overflow: handler |> Config.get!(:sender_pool_max_overflow)
+         number_of_senders: handler |> Config.get!(:sender_pool_size)
        ]},
       {DispatcherSupervisor,
        [
          handler: handler,
-         transport: SenderPool,
+         sender: {SenderWorker, Config.get!(handler, :sender_pool_size)},
          token_secret: handler |> Config.get!(:token_secret),
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size)

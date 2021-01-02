@@ -8,13 +8,14 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   alias Requiem.ConnectionID
   alias Requiem.ConnectionSupervisor
   alias Requiem.IncomingPacket.DispatcherRegistry
+  alias Requiem.OutgoingPacket.SenderRegistry
   alias Requiem.QUIC
   alias Requiem.RetryToken
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
-          transport: module,
+          sender: {module, non_neg_integer},
           token_secret: binary,
           conn_id_secret: binary,
           worker_index: non_neg_integer,
@@ -23,7 +24,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
         }
 
   defstruct handler: nil,
-            transport: nil,
+            sender: nil,
             token_secret: "",
             conn_id_secret: "",
             worker_index: 0,
@@ -47,6 +48,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   @spec dispatch(pid, Address.t(), iodata()) :: :ok
   def dispatch(pid, address, packet) do
     GenServer.cast(pid, {:packet, address, packet})
+    :ok
   end
 
   @spec start_link(Keyword.t()) :: GenServer.on_start()
@@ -115,11 +117,22 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
       worker_index: Keyword.fetch!(opts, :worker_index),
-      transport: Keyword.fetch!(opts, :transport),
+      sender: Keyword.fetch!(opts, :sender),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
       trace_id: inspect(self())
     }
+  end
+
+  defp send(address, packet, %__MODULE__{handler: handler, sender: {sender, num}}) do
+    case SenderRegistry.lookup(handler, :rand.uniform(num) - 1) do
+      {:ok, pid} ->
+        sender.send(pid, address, packet)
+
+      {:error, :not_found} ->
+        Logger.error("<Requiem.IncomingDispatcher> failed to send, sender-process not found")
+        {:error, :not_found}
+    end
   end
 
   defp handle_regular_packet(address, packet, _scid, dcid, state)
@@ -141,7 +154,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
     case QUIC.Packet.build_negotiate_version(state.buffer, scid, dcid) do
       {:ok, resp} ->
-        state.transport.send(state.handler, address, resp)
+        send(address, resp, state)
         :ok
 
       error ->
@@ -157,7 +170,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
          {:ok, resp} <-
            QUIC.Packet.build_retry(state.buffer, scid, dcid, new_id, token, version) do
       Tracer.trace(__MODULE__, state.trace_id, "@send")
-      state.transport.send(state.handler, address, resp)
+      send(address, resp, state)
       :ok
     else
       {:error, _reason} -> :error
@@ -175,7 +188,7 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
 
         case create_connection_if_needed(
                state.handler,
-               state.transport,
+               state.sender,
                address,
                scid,
                dcid,
@@ -214,14 +227,14 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     end
   end
 
-  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid) do
+  defp create_connection_if_needed(_handler, _sender, _address, _scid, <<>>, _odcid) do
     :ok
   end
 
-  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid) do
+  defp create_connection_if_needed(handler, sender, address, scid, dcid, odcid) do
     ConnectionSupervisor.create_connection(
       handler,
-      transport,
+      sender,
       address,
       scid,
       dcid,
@@ -229,5 +242,6 @@ defmodule Requiem.IncomingPacket.DispatcherWorker do
     )
   end
 
-  defp name(handler, index), do: Module.concat([handler, __MODULE__, "Worker_#{index}"])
+  defp name(handler, index),
+    do: Module.concat([handler, __MODULE__, "Worker_#{index}"])
 end
