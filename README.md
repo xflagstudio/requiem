@@ -1,4 +1,4 @@
-# [WIP] ReQUIem
+# ReQUIem
 
 QuicTransport (WebTransport over QUIC) framework for Elixir.
 
