@@ -1,5 +1,4 @@
 defmodule Requiem.Transport do
-
   use GenServer
   require Logger
   require Requiem.Tracer
