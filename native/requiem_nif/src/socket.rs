@@ -77,6 +77,12 @@ impl Socket {
                             return;
                         }
                     };
+
+                    if len < 4 {
+                        // too short packet. ignore
+                        return;
+                    }
+
                     if len > 1350 {
                         // too big packet. ignore
                         return;
