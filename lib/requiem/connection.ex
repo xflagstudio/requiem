@@ -17,6 +17,7 @@ defmodule Requiem.Connection do
           handler: module,
           handler_state: any,
           handler_initialized: boolean,
+          allow_address_routing: boolean,
           transport: module,
           trace_id: binary,
           web_transport: boolean,
@@ -28,6 +29,7 @@ defmodule Requiem.Connection do
   defstruct handler: nil,
             handler_state: nil,
             handler_initialized: true,
+            allow_address_routing: false,
             transport: nil,
             trace_id: nil,
             web_transport: true,
@@ -61,11 +63,13 @@ defmodule Requiem.Connection do
       {:ok, _pid} ->
         Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
 
-        AddressTable.insert(
-          state.handler,
-          state.conn_state.address,
-          state.conn_state.dcid
-        )
+        if state.allow_address_routing do
+          AddressTable.insert(
+            state.handler,
+            state.conn_state.address,
+            state.conn_state.dcid
+          )
+        end
 
         send(self(), :__accept__)
         {:ok, state}
@@ -615,10 +619,12 @@ defmodule Requiem.Connection do
       state.conn_state.dcid
     )
 
-    AddressTable.delete(
-      state.handler,
-      state.conn_state.address
-    )
+    if state.allow_address_routing do
+      AddressTable.delete(
+        state.handler,
+        state.conn_state.address
+      )
+    end
 
     if state.handler_initialized do
       ExceptionGuard.guard(
@@ -682,6 +688,7 @@ defmodule Requiem.Connection do
       handler: Keyword.fetch!(opts, :handler),
       handler_state: nil,
       handler_initialized: false,
+      allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       transport: Keyword.fetch!(opts, :transport),
       trace_id: trace_id,
       web_transport: Keyword.get(opts, :web_transport, true),

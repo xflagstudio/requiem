@@ -54,9 +54,7 @@ defmodule Requiem.Transport do
 
       {:error, reason} ->
         Logger.error(
-          "<Requiem.Transport> failed to open UDP port #{to_string(port)}: #{
-            inspect(reason)
-          }"
+          "<Requiem.Transport> failed to open UDP port #{to_string(port)}: #{inspect(reason)}"
         )
 
         {:stop, :normal}

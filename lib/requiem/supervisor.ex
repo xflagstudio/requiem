@@ -31,7 +31,11 @@ defmodule Requiem.Supervisor do
   def init([handler, otp_app]) do
     handler |> Config.init(otp_app)
     handler |> QUIC.setup()
-    handler |> AddressTable.init()
+
+    if handler |> Config.get(:allow_address_routing) do
+      handler |> AddressTable.init()
+    end
+
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
 
@@ -47,7 +51,8 @@ defmodule Requiem.Supervisor do
          transport: Transport,
          token_secret: handler |> Config.get!(:token_secret),
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
-         number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size)
+         number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
+         allow_address_routing: handler |> Config.get!(:allow_address_routing)
        ]},
       {Transport,
        [
