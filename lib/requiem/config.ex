@@ -7,8 +7,6 @@ defmodule Requiem.Config do
           :web_transport
           | :port
           | :sender_buffering_interval
-          | :sender_pool_size
-          | :sender_pool_max_overflow
           | :dispatcher_pool_size
           | :stream_buffer_pool_size
           | :stream_buffer_size
@@ -46,8 +44,6 @@ defmodule Requiem.Config do
     web_transport: true,
     port: 443,
     sender_buffering_interval: 0,
-    sender_pool_size: 10,
-    sender_pool_max_overflow: 0,
     dispatcher_pool_size: 10,
     stream_buffer_pool_size: 10,
     stream_buffer_size: 1024 * 1024,
@@ -65,8 +61,6 @@ defmodule Requiem.Config do
     web_transport: true,
     port: true,
     sender_buffering_interval: true,
-    sender_pool_size: true,
-    sender_pool_max_overflow: true,
     dispatcher_pool_size: true,
     stream_buffer_pool_size: true,
     stream_buffer_size: true,

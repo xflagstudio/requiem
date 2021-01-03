@@ -31,10 +31,6 @@ defmodule Requiem.Transport.RustUDP do
             event_capacity: 0,
             polling_timeout: 0
 
-  def batch_send(handler, batch) do
-    handler |> name() |> GenServer.cast({:batch_send, batch})
-  end
-
   def send(handler, address, packet) do
     handler |> name() |> GenServer.cast({:send, address, packet})
   end
@@ -76,17 +72,6 @@ defmodule Requiem.Transport.RustUDP do
   def handle_cast({:send, address, packet}, state) do
     Tracer.trace(__MODULE__, "@send")
     send_packet(state.handler, address, packet)
-    {:noreply, state}
-  end
-
-  def handle_cast({:batch_send, batch}, state) do
-    Tracer.trace(__MODULE__, "@batch_send")
-
-    batch
-    |> Enum.each(fn {address, packet} ->
-      send_packet(state.handler, address, packet)
-    end)
-
     {:noreply, state}
   end
 

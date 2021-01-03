@@ -14,8 +14,10 @@ config :requiem_echo, RequiemEcho.Handler,
   initial_max_streams_bidi: 10,
   disable_active_migration: true,
   enable_early_data: true,
-  rust_transport: true,
+  rust_transport: false,
   rust_transport_host: "0.0.0.0",
+  rust_transport_event_capacity: 1024,
+  rust_transport_polling_timeout: 5,
   enable_dgram: true
 
 config :requiem, :trace, true
