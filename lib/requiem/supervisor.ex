@@ -10,8 +10,7 @@ defmodule Requiem.Supervisor do
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherSupervisor
   alias Requiem.DispatcherRegistry
-  alias Requiem.Transport.GenUDP
-  alias Requiem.Transport.RustUDP
+  alias Requiem.Transport
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
@@ -45,26 +44,12 @@ defmodule Requiem.Supervisor do
       {DispatcherSupervisor,
        [
          handler: handler,
-         transport: handler |> transport_module(),
+         transport: Transport,
          token_secret: handler |> Config.get!(:token_secret),
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size)
        ]},
-      handler |> transport_spec()
-    ]
-  end
-
-  defp transport_module(handler) do
-    if handler |> Config.get!(:rust_transport) do
-      RustUDP
-    else
-      GenUDP
-    end
-  end
-
-  defp transport_spec(handler) do
-    if handler |> Config.get!(:rust_transport) do
-      {RustUDP,
+      {Transport,
        [
          handler: handler,
          port: handler |> Config.get!(:port),
@@ -73,14 +58,7 @@ defmodule Requiem.Supervisor do
          host: handler |> Config.get!(:host),
          polling_timeout: handler |> Config.get!(:socket_polling_timeout)
        ]}
-    else
-      {GenUDP,
-       [
-         handler: handler,
-         number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
-         port: handler |> Config.get!(:port)
-       ]}
-    end
+    ]
   end
 
   defp name(handler),

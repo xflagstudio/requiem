@@ -11,7 +11,6 @@ defmodule Requiem.Config do
           | :dispatcher_pool_size
           | :stream_buffer_pool_size
           | :stream_buffer_size
-          | :rust_transport
           | :socket_event_capacity
           | :socket_polling_timeout
           | :token_secret
@@ -52,7 +51,6 @@ defmodule Requiem.Config do
     connection_id_secret: :crypto.strong_rand_bytes(32),
     dgram_queue_size: 1000,
     max_idle_timeout: 60_000,
-    rust_transport: true,
     socket_event_capacity: 1024,
     socket_polling_timeout: 10
   ]
@@ -65,7 +63,6 @@ defmodule Requiem.Config do
     dispatcher_pool_size: true,
     stream_buffer_pool_size: true,
     stream_buffer_size: true,
-    rust_transport: true,
     socket_event_capacity: true,
     socket_polling_timeout: true,
     token_secret: true,

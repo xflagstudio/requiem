@@ -1,7 +1,4 @@
-defmodule Requiem.Transport.RustUDP do
-  @moduledoc """
-  This is an experimental module that aims to achieve high UDP throughput by using NIF.
-  """
+defmodule Requiem.Transport do
 
   use GenServer
   require Logger
@@ -52,13 +49,13 @@ defmodule Requiem.Transport.RustUDP do
            timeout
          ) do
       :ok ->
-        Logger.info("<Requiem.Transport.RustUDP> opened #{host}:#{port}")
+        Logger.info("<Requiem.Transport> opened #{host}:#{port}")
         Process.flag(:trap_exit, true)
         {:ok, state}
 
       {:error, reason} ->
         Logger.error(
-          "<Requiem.Transport.RustUDP> failed to open UDP port #{to_string(state.port)}: #{
+          "<Requiem.Transport> failed to open UDP port #{to_string(state.port)}: #{
             inspect(reason)
           }"
         )
@@ -69,13 +66,13 @@ defmodule Requiem.Transport.RustUDP do
 
   @impl GenServer
   def handle_info({:socket_error, reason}, state) do
-    Logger.error("<Requiem.Transport.RustUDP> socket error. #{inspect(reason)}")
+    Logger.error("<Requiem.Transport> socket error. #{inspect(reason)}")
     {:stop, {:shutdown, :socket_error}, state}
   end
 
   @impl GenServer
   def terminate(reason, state) do
-    Logger.info("<Requiem.Transport.RustUDP> @terminate: #{inspect(reason)}")
+    Logger.info("<Requiem.Transport> @terminate: #{inspect(reason)}")
     QUIC.Socket.close(state.handler)
     :ok
   end
