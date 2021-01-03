@@ -19,6 +19,7 @@ use std::thread;
 use std::time;
 
 use crate::common::{self, atoms};
+use crate::packet::{self};
 
 type ModuleName = Vec<u8>;
 type SocketCloser = RwLock<HashMap<ModuleName, Arc<RwLock<bool>>>>;
@@ -95,36 +96,58 @@ impl Socket {
 
                     if len < 4 {
                         // too short packet. ignore
-                        return;
+                        continue;
                     }
 
                     if len > 1350 {
                         // too big packet. ignore
-                        return;
+                        continue;
                     }
 
-                    //let target_pid = self.choose_target_pid(target_pids);
-                    let mut packet = OwnedBinary::new(len).unwrap();
-                    packet.as_mut_slice().copy_from_slice(&self.buf[..len]);
+                    match quiche::Header::from_slice(&mut self.buf[..len], quiche::MAX_CONN_ID_LEN)
+                    {
+                        Ok(hdr) => {
+                            let scid = packet::header_scid_binary(&hdr);
+                            let dcid = packet::header_dcid_binary(&hdr);
+                            let token = packet::header_token_binary(&hdr);
 
-                    env.send(
-                        &target_pids[self.target_index],
-                        //&target_pid,
-                        make_tuple(
-                            *env,
-                            &[
-                                atoms::__packet__().to_term(*env),
-                                ResourceArc::new(Peer::new(peer)).encode(*env),
-                                packet.release(*env).to_term(*env),
-                            ],
-                        ),
-                    );
+                            let version = hdr.version;
 
-                    if self.target_index >= target_pids.len() - 1 {
-                        self.target_index = 0;
-                    } else {
-                        self.target_index += 1;
-                    }
+                            let typ = packet::packet_type(hdr.ty);
+                            let is_version_supported = quiche::version_is_supported(hdr.version);
+
+                            let mut body = OwnedBinary::new(len).unwrap();
+                            body.as_mut_slice().copy_from_slice(&self.buf[..len]);
+
+                            env.send(
+                                &target_pids[self.target_index],
+                                make_tuple(
+                                    *env,
+                                    &[
+                                        atoms::__packet__().to_term(*env),
+                                        ResourceArc::new(Peer::new(peer)).encode(*env),
+                                        body.release(*env).to_term(*env),
+                                        scid.release(*env).to_term(*env),
+                                        dcid.release(*env).to_term(*env),
+                                        token.release(*env).to_term(*env),
+                                        version.encode(*env),
+                                        typ.to_term(*env),
+                                        is_version_supported.encode(*env),
+                                    ],
+                                ),
+                            );
+
+                            if self.target_index >= target_pids.len() - 1 {
+                                self.target_index = 0;
+                            } else {
+                                self.target_index += 1;
+                            }
+                        }
+                        Err(_) => {
+                            // ignore
+                            continue;
+                        }
+                    };
                 }
                 _ => {}
             }

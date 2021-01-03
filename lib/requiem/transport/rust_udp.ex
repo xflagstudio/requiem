@@ -7,25 +7,15 @@ defmodule Requiem.Transport.RustUDP do
   require Logger
   require Requiem.Tracer
 
-  alias Requiem.Address
   alias Requiem.DispatcherRegistry
-  alias Requiem.DispatcherWorker
   alias Requiem.QUIC
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
-          handler: module,
-          dispatcher_index: non_neg_integer,
-          dispatchers: [pid],
-          port: non_neg_integer,
-          host: binary
+          handler: module
         }
 
-  defstruct handler: nil,
-            dispatcher_index: 0,
-            dispatchers: [],
-            port: 0,
-            host: ""
+  defstruct handler: nil
 
   def send(handler, address, packet) do
     Tracer.trace(__MODULE__, "@send")
@@ -45,22 +35,24 @@ defmodule Requiem.Transport.RustUDP do
         Keyword.fetch!(opts, :number_of_dispatchers)
       )
 
-    state = new(opts, dispatchers)
+    state = new(opts)
 
     capacity = Keyword.fetch!(opts, :event_capacity)
     timeout = Keyword.fetch!(opts, :polling_timeout)
+    host = Keyword.fetch!(opts, :host)
+    port = Keyword.fetch!(opts, :port)
 
     case QUIC.Socket.open(
            state.handler,
-           state.host,
-           state.port,
+           host,
+           port,
            self(),
            dispatchers,
            capacity,
            timeout
          ) do
       :ok ->
-        Logger.info("<Requiem.Transport.RustUDP> opened")
+        Logger.info("<Requiem.Transport.RustUDP> opened #{host}:#{port}")
         Process.flag(:trap_exit, true)
         {:ok, state}
 
@@ -76,34 +68,6 @@ defmodule Requiem.Transport.RustUDP do
   end
 
   @impl GenServer
-  def handle_info({:__packet__, peer, data}, state) do
-    Tracer.trace(__MODULE__, "@received")
-    {:ok, host, port} = QUIC.Socket.address_parts(peer)
-
-    address =
-      if byte_size(host) == 4 do
-        <<n1, n2, n3, n4>> = host
-        Address.new({n1, n2, n3, n4}, port, peer)
-      else
-        <<
-          n1::unsigned-integer-size(16),
-          n2::unsigned-integer-size(16),
-          n3::unsigned-integer-size(16),
-          n4::unsigned-integer-size(16),
-          n5::unsigned-integer-size(16),
-          n6::unsigned-integer-size(16),
-          n7::unsigned-integer-size(16),
-          n8::unsigned-integer-size(16)
-        >> = host
-
-        Address.new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
-      end
-
-    {pid, new_state} = choose_dispatcher(state)
-    DispatcherWorker.dispatch(pid, address, data)
-    {:noreply, new_state}
-  end
-
   def handle_info({:socket_error, reason}, state) do
     Logger.error("<Requiem.Transport.RustUDP> socket error. #{inspect(reason)}")
     {:stop, {:shutdown, :socket_error}, state}
@@ -116,28 +80,10 @@ defmodule Requiem.Transport.RustUDP do
     :ok
   end
 
-  defp new(opts, dispatchers) do
+  defp new(opts) do
     %__MODULE__{
-      handler: Keyword.fetch!(opts, :handler),
-      dispatcher_index: 0,
-      dispatchers: dispatchers,
-      port: Keyword.fetch!(opts, :port),
-      host: Keyword.fetch!(opts, :host)
+      handler: Keyword.fetch!(opts, :handler)
     }
-  end
-
-  defp choose_dispatcher(state) do
-    pid = Enum.at(state.dispatchers, state.dispatcher_index)
-    state = update_dispatcher_index(state)
-    {pid, state}
-  end
-
-  defp update_dispatcher_index(state) do
-    if state.dispatcher_index >= length(state.dispatchers) - 1 do
-      %{state | dispatcher_index: 0}
-    else
-      %{state | dispatcher_index: state.dispatcher_index + 1}
-    end
   end
 
   defp name(handler),

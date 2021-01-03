@@ -77,16 +77,51 @@ defmodule Requiem.DispatcherWorker do
   end
 
   @impl GenServer
-  def handle_info({:__packet__, peer, packet}, state) do
+  def handle_info(
+        {:__packet__, peer, packet, scid, dcid, token, version, packet_type,
+         is_version_supported},
+        state
+      ) do
+    # this come from native receiver socket
     Tracer.trace(__MODULE__, "@received")
     address = Address.from_rust_peer(peer)
-    process_packet(address, packet, state)
+
+    process_packet(
+      address,
+      packet,
+      scid,
+      dcid,
+      token,
+      version,
+      packet_type,
+      is_version_supported,
+      state
+    )
+
     {:noreply, state}
   end
 
   @impl GenServer
   def handle_cast({:packet, address, packet}, state) do
-    process_packet(address, packet, state)
+    # this comes from Transport.GenUDP
+    case QUIC.Packet.parse_header(packet) do
+      {:error, reason} ->
+        Tracer.trace(__MODULE__, "@bad_packet:#{inspect(reason)}, ignore")
+
+      {:ok, scid, dcid, token, version, packet_type, is_version_supported} ->
+        process_packet(
+          address,
+          packet,
+          scid,
+          dcid,
+          token,
+          version,
+          packet_type,
+          is_version_supported,
+          state
+        )
+    end
+
     {:noreply, state}
   end
 
@@ -96,31 +131,32 @@ defmodule Requiem.DispatcherWorker do
     :ok
   end
 
-  defp process_packet(address, packet, state) do
-    case QUIC.Packet.parse_header(packet) do
-      {:ok, scid, dcid, _token, _version, :initial, false} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@unsupported_version")
-        handle_version_unsupported_packet(address, scid, dcid, state)
+  defp process_packet(address, _packet, scid, dcid, _token, _version, :initial, false, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@unsupported_version")
+    handle_version_unsupported_packet(address, scid, dcid, state)
+    :ok
+  end
 
-      {:ok, scid, dcid, token, version, :initial, true} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@init")
-        handle_init_packet(address, packet, scid, dcid, token, version, state)
+  defp process_packet(address, packet, scid, dcid, token, version, :initial, true, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@init")
+    handle_init_packet(address, packet, scid, dcid, token, version, state)
+    :ok
+  end
 
-      {:ok, scid, dcid, _token, _version, packet_type, _version_supported} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@regular: #{packet_type}")
-        handle_regular_packet(address, packet, scid, dcid, state)
-
-      {:error, reason} ->
-        if state.trace do
-          Logger.debug(
-            "<Requiem.DispatcherWorker:#{inspect(self())}> bad formatted packet: #{
-              inspect(reason)
-            }"
-          )
-        end
-
-        :ok
-    end
+  defp process_packet(
+         address,
+         packet,
+         scid,
+         dcid,
+         _token,
+         _version,
+         packet_type,
+         _version_supported,
+         state
+       ) do
+    Tracer.trace(__MODULE__, state.trace_id, "@regular: #{packet_type}")
+    handle_regular_packet(address, packet, scid, dcid, state)
+    :ok
   end
 
   defp new(opts) do

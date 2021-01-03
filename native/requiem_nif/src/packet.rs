@@ -17,7 +17,7 @@ impl PacketBuildBuffer {
     }
 }
 
-fn packet_type(ty: quiche::Type) -> Atom {
+pub(crate) fn packet_type(ty: quiche::Type) -> Atom {
     match ty {
         quiche::Type::Initial => atoms::initial(),
         quiche::Type::Short => atoms::short(),
@@ -28,27 +28,27 @@ fn packet_type(ty: quiche::Type) -> Atom {
     }
 }
 
-fn header_token_binary(hdr: &quiche::Header) -> NifResult<OwnedBinary> {
+pub(crate) fn header_token_binary(hdr: &quiche::Header) -> OwnedBinary {
     if let Some(t) = hdr.token.as_ref() {
         let mut token = OwnedBinary::new(t.len()).unwrap();
         token.as_mut_slice().copy_from_slice(&t);
-        Ok(token)
+        token
     } else {
         let empty = OwnedBinary::new(0).unwrap();
-        Ok(empty)
+        empty
     }
 }
 
-fn header_dcid_binary(hdr: &quiche::Header) -> NifResult<OwnedBinary> {
+pub(crate) fn header_dcid_binary(hdr: &quiche::Header) -> OwnedBinary {
     let mut dcid = OwnedBinary::new(hdr.dcid.len()).unwrap();
     dcid.as_mut_slice().copy_from_slice(hdr.dcid.as_ref());
-    Ok(dcid)
+    dcid
 }
 
-fn header_scid_binary(hdr: &quiche::Header) -> NifResult<OwnedBinary> {
+pub(crate) fn header_scid_binary(hdr: &quiche::Header) -> OwnedBinary {
     let mut scid = OwnedBinary::new(hdr.scid.len()).unwrap();
     scid.as_mut_slice().copy_from_slice(hdr.scid.as_ref());
-    Ok(scid)
+    scid
 }
 
 #[rustler::nif]
@@ -65,9 +65,9 @@ pub fn packet_parse_header<'a>(
 
     match quiche::Header::from_slice(&mut packet.as_mut_slice(), quiche::MAX_CONN_ID_LEN) {
         Ok(hdr) => {
-            let scid = header_scid_binary(&hdr)?;
-            let dcid = header_dcid_binary(&hdr)?;
-            let token = header_token_binary(&hdr)?;
+            let scid = header_scid_binary(&hdr);
+            let dcid = header_dcid_binary(&hdr);
+            let token = header_token_binary(&hdr);
 
             let version = hdr.version;
 
