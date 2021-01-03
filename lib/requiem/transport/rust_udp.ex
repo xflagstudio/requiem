@@ -127,8 +127,8 @@ defmodule Requiem.Transport.RustUDP do
   end
 
   def handle_info({:socket_error, reason}, state) do
-    Tracer.trace(__MODULE__, "@rust_error: #{inspect(reason)}")
-    {:noreply, state}
+    Logger.error("<Requiem.Transport.RustUDP> socket error. #{inspect(reason)}")
+    {:stop, {:shutdown, :socket_error}, state}
   end
 
   @impl GenServer

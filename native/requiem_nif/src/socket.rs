@@ -64,16 +64,13 @@ impl Socket {
                 Token(0) => {
                     let (len, peer) = match self.sock.recv_from(&mut self.buf) {
                         Ok(v) => v,
-                        Err(_e) => {
-                            /*
+                        Err(e) => {
                             if e.kind() != std::io::ErrorKind::WouldBlock {
                                 env.send(pid, make_tuple(*env, &[
                                         atoms::socket_error().to_term(*env),
                                         atoms::cant_receive().to_term(*env),
                                 ]));
-                                break;
                             }
-                            */
                             return;
                         }
                     };
@@ -147,7 +144,7 @@ pub fn socket_open(
 
     let oenv = OwnedEnv::new();
     thread::spawn(move || {
-        oenv.run(|env| loop {
+        oenv.run(move |env| loop {
             receiver.poll(&env, &pid, poll_interval);
         })
     });
