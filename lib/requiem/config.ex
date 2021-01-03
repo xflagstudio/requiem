@@ -13,6 +13,7 @@ defmodule Requiem.Config do
           | :stream_buffer_size
           | :socket_event_capacity
           | :socket_polling_timeout
+          | :allow_address_routing
           | :token_secret
           | :connection_id_secret
           | :dgram_queue_size
@@ -47,6 +48,7 @@ defmodule Requiem.Config do
     dispatcher_pool_size: 10,
     stream_buffer_pool_size: 10,
     stream_buffer_size: 1024 * 1024,
+    allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
     dgram_queue_size: 1000,
@@ -63,6 +65,7 @@ defmodule Requiem.Config do
     dispatcher_pool_size: true,
     stream_buffer_pool_size: true,
     stream_buffer_size: true,
+    allow_address_routing: true,
     socket_event_capacity: true,
     socket_polling_timeout: true,
     token_secret: true,

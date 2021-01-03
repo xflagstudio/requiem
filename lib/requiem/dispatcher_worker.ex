@@ -18,6 +18,7 @@ defmodule Requiem.DispatcherWorker do
           token_secret: binary,
           conn_id_secret: binary,
           worker_index: non_neg_integer,
+          allow_address_routing: boolean,
           buffer: term,
           trace_id: binary
         }
@@ -27,6 +28,7 @@ defmodule Requiem.DispatcherWorker do
             token_secret: "",
             conn_id_secret: "",
             worker_index: 0,
+            allow_address_routing: false,
             buffer: nil,
             trace_id: ""
 
@@ -83,7 +85,7 @@ defmodule Requiem.DispatcherWorker do
         state
       ) do
     # this come from native receiver socket
-    Tracer.trace(__MODULE__, "@received")
+    Tracer.trace(__MODULE__, state.trace_id, "@received")
     address = Address.from_rust_peer(peer)
 
     process_packet(
@@ -106,7 +108,7 @@ defmodule Requiem.DispatcherWorker do
     # this comes from Transport.GenUDP
     case QUIC.Packet.parse_header(packet) do
       {:error, reason} ->
-        Tracer.trace(__MODULE__, "@bad_packet:#{inspect(reason)}, ignore")
+        Tracer.trace(__MODULE__, state.trace_id, "@bad_packet:#{inspect(reason)}, ignore")
 
       {:ok, scid, dcid, token, version, packet_type, is_version_supported} ->
         process_packet(
@@ -166,6 +168,7 @@ defmodule Requiem.DispatcherWorker do
       transport: Keyword.fetch!(opts, :transport),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
+      allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       trace_id: inspect(self())
     }
   end
@@ -177,7 +180,12 @@ defmodule Requiem.DispatcherWorker do
 
   defp handle_regular_packet(address, packet, _scid, dcid, state)
        when byte_size(dcid) == 20 or byte_size(dcid) == 0 do
-    case ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
+    case ConnectionSupervisor.lookup_connection(
+           state.handler,
+           dcid,
+           address,
+           state.allow_address_routing
+         ) do
       {:ok, pid} ->
         Connection.process_packet(pid, address, packet)
 
@@ -227,12 +235,11 @@ defmodule Requiem.DispatcherWorker do
         Tracer.trace(__MODULE__, state.trace_id, "@validate_success")
 
         case create_connection_if_needed(
-               state.handler,
-               state.transport,
                address,
                scid,
                dcid,
-               odcid
+               odcid,
+               state
              ) do
           :ok ->
             handle_regular_packet(address, packet, scid, dcid, state)
@@ -252,7 +259,12 @@ defmodule Requiem.DispatcherWorker do
   end
 
   defp handle_init_packet(address, packet, scid, dcid, token, version, state) do
-    case ConnectionSupervisor.lookup_connection(state.handler, dcid, address) do
+    case ConnectionSupervisor.lookup_connection(
+           state.handler,
+           dcid,
+           address,
+           state.allow_address_routing
+         ) do
       {:ok, pid} ->
         Connection.process_packet(pid, address, packet)
 
@@ -267,18 +279,19 @@ defmodule Requiem.DispatcherWorker do
     end
   end
 
-  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid) do
+  defp create_connection_if_needed(_address, _scid, <<>>, _odcid, _state) do
     :ok
   end
 
-  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid) do
+  defp create_connection_if_needed(address, scid, dcid, odcid, state) do
     ConnectionSupervisor.create_connection(
-      handler,
-      transport,
+      state.handler,
+      state.transport,
       address,
       scid,
       dcid,
-      odcid
+      odcid,
+      state.allow_address_routing
     )
   end
 
