@@ -74,7 +74,6 @@ defmodule Requiem.Connection do
         Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
         {:stop, :normal}
     end
-
   end
 
   @impl GenServer

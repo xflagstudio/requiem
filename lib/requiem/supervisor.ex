@@ -69,9 +69,9 @@ defmodule Requiem.Supervisor do
          handler: handler,
          port: handler |> Config.get!(:port),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
-         event_capacity: handler |> Config.get!(:rust_transport_event_capacity),
-         host: handler |> Config.get!(:rust_transport_host),
-         polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout)
+         event_capacity: handler |> Config.get!(:socket_event_capacity),
+         host: handler |> Config.get!(:host),
+         polling_timeout: handler |> Config.get!(:socket_polling_timeout)
        ]}
     else
       {GenUDP,
