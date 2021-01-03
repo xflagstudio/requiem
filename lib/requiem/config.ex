@@ -54,7 +54,7 @@ defmodule Requiem.Config do
     dgram_queue_size: 1000,
     max_idle_timeout: 60_000,
     socket_event_capacity: 1024,
-    socket_polling_timeout: 10
+    socket_polling_timeout: 100
   ]
 
   @key_table %{
