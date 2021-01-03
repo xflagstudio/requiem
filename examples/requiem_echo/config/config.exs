@@ -3,7 +3,7 @@ import Config
 config :requiem_echo, RequiemEcho.Handler,
   host: "0.0.0.0",
   port: 3000,
-  rust_transport: true,
+  rust_transport: false,
   socket_event_capacity: 1024,
   socket_polling_timeout: 5,
   cert_chain: System.get_env("CERT"),

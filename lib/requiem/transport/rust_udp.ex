@@ -126,7 +126,7 @@ defmodule Requiem.Transport.RustUDP do
   end
 
   defp choose_dispatcher(state) do
-    pid = state.dispatcers[state.dispatcher_index]
+    pid = Enum.at(state.dispatchers, state.dispatcher_index)
     state = update_dispatcher_index(state)
     {pid, state}
   end
