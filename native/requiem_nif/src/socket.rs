@@ -14,16 +14,17 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::{IpAddr, SocketAddr};
 use std::str;
+use std::sync::Arc;
 use std::thread;
 use std::time;
 
 use crate::common::{self, atoms};
 
 type ModuleName = Vec<u8>;
-// type SocketCloser = RwLock<HashMap<ModuleName, RwLock<bool>>>;
+type SocketCloser = RwLock<HashMap<ModuleName, Arc<RwLock<bool>>>>;
 type SenderSocket = RwLock<HashMap<ModuleName, Mutex<std::net::UdpSocket>>>;
 
-// static CLOSERS: Lazy<SocketCloser> = Lazy::new(|| RwLock::new(HashMap::new()));
+static CLOSERS: Lazy<SocketCloser> = Lazy::new(|| RwLock::new(HashMap::new()));
 static SOCKETS: Lazy<SenderSocket> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub struct Peer {
@@ -136,11 +137,19 @@ pub fn socket_open(
     let std_sock = std::net::UdpSocket::bind(address).unwrap();
     let std_sock2 = std_sock.try_clone().unwrap();
 
+    let closer = Arc::new(RwLock::new(false));
+    let closer2 = closer.clone();
+
     let cap = event_capacity.try_into().unwrap();
     let mut receiver = Socket::new(std_sock2, cap);
+
     let oenv = OwnedEnv::new();
     thread::spawn(move || {
         oenv.run(move |env| loop {
+            let should_close = closer2.read();
+            if *should_close {
+                break;
+            }
             receiver.poll(&env, &pid, poll_interval);
         })
     });
@@ -148,6 +157,11 @@ pub fn socket_open(
     let mut socket_table = SOCKETS.write();
     if !socket_table.contains_key(module) {
         socket_table.insert(module.to_vec(), Mutex::new(std_sock));
+    }
+
+    let mut closer_table = CLOSERS.write();
+    if !closer_table.contains_key(module) {
+        closer_table.insert(module.to_vec(), closer);
     }
 
     Ok(atoms::ok())
@@ -175,6 +189,16 @@ pub fn socket_close(module: Binary) -> NifResult<Atom> {
     let mut socket_table = SOCKETS.write();
     if socket_table.contains_key(module) {
         socket_table.remove(module);
+    }
+
+    let mut closer_table = CLOSERS.write();
+    if closer_table.contains_key(module) {
+        if let Some(closer) = closer_table.get(module) {
+            let mut should_close = closer.write();
+            *should_close = true;
+        }
+
+        closer_table.remove(module);
     }
     Ok(atoms::ok())
 }
