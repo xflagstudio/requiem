@@ -14,15 +14,15 @@ defmodule Requiem.Transport.GenUDP do
 
   @type t :: %__MODULE__{
           handler: module,
-          number_of_dispatchers: non_neg_integer,
           dispatcher_index: non_neg_integer,
+          dispatchers: [pid],
           port: non_neg_integer,
           sock: port
         }
 
   defstruct handler: nil,
-            number_of_dispatchers: 0,
             dispatcher_index: 0,
+            dispatchers: [],
             port: 0,
             sock: nil
 
@@ -37,7 +37,13 @@ defmodule Requiem.Transport.GenUDP do
 
   @impl GenServer
   def init(opts) do
-    state = new(opts)
+    dispatchers =
+      DispatcherRegistry.gather(
+        Keyword.fetch!(opts, :handler),
+        Keyword.fetch!(opts, :number_of_dispatchers)
+      )
+
+    state = new(opts, dispatchers)
 
     case :gen_udp.open(state.port, [:binary, active: true]) do
       {:ok, sock} ->
@@ -64,22 +70,14 @@ defmodule Requiem.Transport.GenUDP do
     {:noreply, state}
   end
 
-  defp find_dispatcher(state, retry_count) when retry_count < 3 do
-    case DispatcherRegistry.lookup(state.handler, state.dispatcher_index) do
-      {:ok, pid} ->
-        {:ok, pid, update_dispatcher_index(state)}
-
-      {:error, :not_found} ->
-        state |> update_dispatcher_index() |> find_dispatcher(retry_count + 1)
-    end
-  end
-
-  defp find_dispatcher(_state, _retry_count) do
-    {:error, :not_found}
+  defp choose_dispatcher(state) do
+    pid = state.dispatcers[state.dispatcher_index]
+    state = update_dispatcher_index(state)
+    {pid, state}
   end
 
   defp update_dispatcher_index(state) do
-    if state.dispatcher_index >= state.number_of_dispatchers - 1 do
+    if state.dispatcher_index >= length(state.dispatchers) - 1 do
       %{state | dispatcher_index: 0}
     else
       %{state | dispatcher_index: state.dispatcher_index + 1}
@@ -89,20 +87,13 @@ defmodule Requiem.Transport.GenUDP do
   @impl GenServer
   def handle_info({:udp, _sock, address, port, data}, state) do
     Tracer.trace(__MODULE__, "@received")
-    packet = IO.iodata_to_binary(data)
 
     if byte_size(data) <= @max_quic_packet_size do
       Tracer.trace(__MODULE__, "available size of packet. try to dispatch")
 
-      case find_dispatcher(state, 0) do
-        {:ok, pid, new_state} ->
-          DispatcherWorker.dispatch(pid, Address.new(address, port), packet)
-          {:noreply, new_state}
-
-        {:error, :not_found} ->
-          Logger.error("<Requiem.Transport.GenUDP> can't find dispatcher process")
-          {:noreply, state}
-      end
+      {pid, new_state} = choose_dispatcher(state)
+      DispatcherWorker.dispatch(pid, Address.new(address, port), data)
+      {:noreply, new_state}
     else
       {:noreply, state}
     end
@@ -124,11 +115,11 @@ defmodule Requiem.Transport.GenUDP do
     :ok
   end
 
-  defp new(opts) do
+  defp new(opts, dispatchers) do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
-      number_of_dispatchers: Keyword.fetch!(opts, :number_of_dispatchers),
       dispatcher_index: 0,
+      dispatchers: dispatchers,
       port: Keyword.fetch!(opts, :port),
       sock: nil
     }
