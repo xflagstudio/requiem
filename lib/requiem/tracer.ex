@@ -6,6 +6,14 @@ defmodule Requiem.Tracer do
         require Logger
         Logger.debug("<#{unquote(caller)}> #{unquote(msg)}")
       end
+    else
+      quote do
+        # This is useless, just for suppressing unused-variable-warnings.
+        if false do
+          require Logger
+          Logger.debug("<#{unquote(caller)}> #{unquote(msg)}")
+        end
+      end
     end
   end
 
@@ -15,14 +23,13 @@ defmodule Requiem.Tracer do
         require Logger
         Logger.debug("<#{unquote(caller)}:#{unquote(trace_id)}> #{unquote(msg)}")
       end
-    end
-  end
-
-  defmacro trace_fn(caller, trace_id, msg) do
-    if @traceable do
+    else
       quote do
-        require Logger
-        Logger.debug("<#{unquote(caller)}:#{unquote(trace_id)}> #{unquote(msg)()}")
+        # This is useless, just for suppressing unused-variable-warnings.
+        if false do
+          require Logger
+          Logger.debug("<#{unquote(caller)}:#{unquote(trace_id)}> #{unquote(msg)}")
+        end
       end
     end
   end
