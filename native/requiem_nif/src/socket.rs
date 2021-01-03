@@ -4,18 +4,27 @@ use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, NifResult, ResourceArc};
 
-use parking_lot::Mutex;
+use once_cell::sync::Lazy;
+use parking_lot::{Mutex, RwLock};
 
 use mio::net::UdpSocket;
 use mio::{Events, Interest, Poll, Token};
 
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::{IpAddr, SocketAddr};
 use std::str;
 use std::thread;
 use std::time;
 
-use crate::common::atoms;
+use crate::common::{self, atoms};
+
+type ModuleName = Vec<u8>;
+// type SocketCloser = RwLock<HashMap<ModuleName, RwLock<bool>>>;
+type SenderSocket = RwLock<HashMap<ModuleName, Mutex<std::net::UdpSocket>>>;
+
+// static CLOSERS: Lazy<SocketCloser> = Lazy::new(|| RwLock::new(HashMap::new()));
+static SOCKETS: Lazy<SenderSocket> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub struct Peer {
     addr: SocketAddr,
@@ -66,10 +75,16 @@ impl Socket {
                         Ok(v) => v,
                         Err(e) => {
                             if e.kind() != std::io::ErrorKind::WouldBlock {
-                                env.send(pid, make_tuple(*env, &[
-                                        atoms::socket_error().to_term(*env),
-                                        atoms::cant_receive().to_term(*env),
-                                ]));
+                                env.send(
+                                    pid,
+                                    make_tuple(
+                                        *env,
+                                        &[
+                                            atoms::socket_error().to_term(*env),
+                                            atoms::cant_receive().to_term(*env),
+                                        ],
+                                    ),
+                                );
                             }
                             return;
                         }
@@ -106,34 +121,16 @@ impl Socket {
     }
 }
 
-pub struct LockedSocket {
-    sock: Mutex<std::net::UdpSocket>,
-}
-
-impl LockedSocket {
-    pub fn new(sock: std::net::UdpSocket) -> Self {
-        LockedSocket {
-            sock: Mutex::new(sock),
-        }
-    }
-
-    pub fn send(&self, address: &SocketAddr, packet: &[u8]) -> bool {
-        let raw = self.sock.lock();
-        if let Err(_) = raw.send_to(packet, *address) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-}
-
 #[rustler::nif]
 pub fn socket_open(
+    module: Binary,
     address: Binary,
     pid: LocalPid,
     event_capacity: u64,
     poll_interval: u64,
-) -> NifResult<(Atom, ResourceArc<LockedSocket>)> {
+) -> NifResult<Atom> {
+    let module = module.as_slice();
+
     let address = str::from_utf8(address.as_slice()).unwrap();
 
     let std_sock = std::net::UdpSocket::bind(address).unwrap();
@@ -141,7 +138,6 @@ pub fn socket_open(
 
     let cap = event_capacity.try_into().unwrap();
     let mut receiver = Socket::new(std_sock2, cap);
-
     let oenv = OwnedEnv::new();
     thread::spawn(move || {
         oenv.run(move |env| loop {
@@ -149,18 +145,37 @@ pub fn socket_open(
         })
     });
 
-    let sock = ResourceArc::new(LockedSocket::new(std_sock));
-    Ok((atoms::ok(), sock))
+    let mut socket_table = SOCKETS.write();
+    if !socket_table.contains_key(module) {
+        socket_table.insert(module.to_vec(), Mutex::new(std_sock));
+    }
+
+    Ok(atoms::ok())
 }
 
 #[rustler::nif]
-pub fn socket_send(
-    sock: ResourceArc<LockedSocket>,
-    peer: ResourceArc<Peer>,
-    packet: Binary,
-) -> NifResult<Atom> {
-    let packet = packet.as_slice();
-    sock.send(&peer.addr, packet);
+pub fn socket_send(module: Binary, peer: ResourceArc<Peer>, packet: Binary) -> NifResult<Atom> {
+    let module = module.as_slice();
+    let socket_table = SOCKETS.read();
+    if let Some(socket) = socket_table.get(module) {
+        let socket = socket.lock();
+        match socket.send_to(packet.as_slice(), &peer.addr) {
+            Ok(_size) => Ok(atoms::ok()),
+            Err(_) => Err(common::error_term(atoms::system_error())),
+        }
+    } else {
+        Err(common::error_term(atoms::not_found()))
+    }
+}
+
+#[rustler::nif]
+pub fn socket_close(module: Binary) -> NifResult<Atom> {
+    let module = module.as_slice();
+
+    let mut socket_table = SOCKETS.write();
+    if socket_table.contains_key(module) {
+        socket_table.remove(module);
+    }
     Ok(atoms::ok())
 }
 
@@ -179,6 +194,5 @@ pub fn socket_address_parts(env: Env, peer: ResourceArc<Peer>) -> NifResult<(Ato
 
 pub fn on_load(env: Env) -> bool {
     rustler::resource!(Peer, env);
-    rustler::resource!(LockedSocket, env);
     true
 }

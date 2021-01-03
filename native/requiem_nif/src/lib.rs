@@ -53,6 +53,7 @@ rustler::init!(
         connection::connection_dgram_send,
         socket::socket_open,
         socket::socket_send,
+        socket::socket_close,
         socket::socket_address_parts,
     ],
     load = load
