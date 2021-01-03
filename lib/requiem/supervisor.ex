@@ -10,9 +10,6 @@ defmodule Requiem.Supervisor do
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherSupervisor
   alias Requiem.DispatcherRegistry
-  alias Requiem.SenderSupervisor
-  alias Requiem.SenderRegistry
-  alias Requiem.SenderWorker
   alias Requiem.Transport.GenUDP
   alias Requiem.Transport.RustUDP
 
@@ -44,19 +41,11 @@ defmodule Requiem.Supervisor do
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
       {Registry, keys: :unique, name: DispatcherRegistry.name(handler)},
-      {Registry, keys: :unique, name: SenderRegistry.name(handler)},
       {ConnectionSupervisor, handler},
-      {SenderSupervisor,
-       [
-         handler: handler,
-         transport: handler |> transport_module(),
-         buffering_interval: handler |> Config.get!(:sender_buffering_interval),
-         number_of_senders: handler |> Config.get!(:sender_pool_size)
-       ]},
       {DispatcherSupervisor,
        [
          handler: handler,
-         sender: {SenderWorker, Config.get!(handler, :sender_pool_size)},
+         transport: handler |> transport_module(),
          token_secret: handler |> Config.get!(:token_secret),
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size)
@@ -80,9 +69,9 @@ defmodule Requiem.Supervisor do
          handler: handler,
          port: handler |> Config.get!(:port),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
-         event_capacity: handler |> Config.get!(:rust_transport_event_capacity),
-         host: handler |> Config.get!(:rust_transport_host),
-         polling_timeout: handler |> Config.get!(:rust_transport_polling_timeout)
+         event_capacity: handler |> Config.get!(:socket_event_capacity),
+         host: handler |> Config.get!(:host),
+         polling_timeout: handler |> Config.get!(:socket_polling_timeout)
        ]}
     else
       {GenUDP,

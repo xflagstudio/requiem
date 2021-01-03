@@ -30,7 +30,7 @@ defmodule Requiem.DispatcherSupervisor do
   defp children(opts) do
     handler = Keyword.fetch!(opts, :handler)
     num = Keyword.fetch!(opts, :number_of_dispatchers)
-    sender = Keyword.fetch!(opts, :sender)
+    transport = Keyword.fetch!(opts, :transport)
     token_secret = Keyword.fetch!(opts, :token_secret)
     conn_id_secret = Keyword.fetch!(opts, :conn_id_secret)
 
@@ -40,7 +40,7 @@ defmodule Requiem.DispatcherSupervisor do
        [
          handler: handler,
          worker_index: idx,
-         sender: sender,
+         transport: transport,
          token_secret: token_secret,
          conn_id_secret: conn_id_secret
        ]}

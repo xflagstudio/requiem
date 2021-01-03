@@ -20,8 +20,7 @@ defmodule Requiem.Transport.RustUDP do
           port: non_neg_integer,
           host: binary,
           event_capacity: non_neg_integer,
-          polling_timeout: non_neg_integer,
-          sock: port
+          polling_timeout: non_neg_integer
         }
 
   defstruct handler: nil,
@@ -30,15 +29,11 @@ defmodule Requiem.Transport.RustUDP do
             port: 0,
             host: "",
             event_capacity: 0,
-            polling_timeout: 0,
-            sock: nil
-
-  def batch_send(handler, batch) do
-    handler |> name() |> GenServer.cast({:batch_send, batch})
-  end
+            polling_timeout: 0
 
   def send(handler, address, packet) do
-    handler |> name() |> GenServer.cast({:send, address, packet})
+    Tracer.trace(__MODULE__, "@send")
+    QUIC.Socket.send(handler, address.raw, packet)
   end
 
   def start_link(opts) do
@@ -51,16 +46,17 @@ defmodule Requiem.Transport.RustUDP do
     state = new(opts)
 
     case QUIC.Socket.open(
+           state.handler,
            state.host,
            state.port,
            self(),
            state.event_capacity,
            state.polling_timeout
          ) do
-      {:ok, sock} ->
+      :ok ->
         Logger.info("<Requiem.Transport.RustUDP> opened")
         Process.flag(:trap_exit, true)
-        {:ok, %{state | sock: sock}}
+        {:ok, state}
 
       {:error, reason} ->
         Logger.error(
@@ -71,24 +67,6 @@ defmodule Requiem.Transport.RustUDP do
 
         {:stop, :normal}
     end
-  end
-
-  @impl GenServer
-  def handle_cast({:send, address, packet}, state) do
-    Tracer.trace(__MODULE__, "@send")
-    send_packet(state.sock, address, packet)
-    {:noreply, state}
-  end
-
-  def handle_cast({:batch_send, batch}, state) do
-    Tracer.trace(__MODULE__, "@batch_send")
-
-    batch
-    |> Enum.each(fn {address, packet} ->
-      send_packet(state.sock, address, packet)
-    end)
-
-    {:noreply, state}
   end
 
   @impl GenServer
@@ -132,8 +110,9 @@ defmodule Requiem.Transport.RustUDP do
   end
 
   @impl GenServer
-  def terminate(reason, _state) do
+  def terminate(reason, state) do
     Logger.info("<Requiem.Transport.RustUDP> @terminate: #{inspect(reason)}")
+    QUIC.Socket.close(state.handler)
     :ok
   end
 
@@ -145,8 +124,7 @@ defmodule Requiem.Transport.RustUDP do
       port: Keyword.fetch!(opts, :port),
       host: Keyword.fetch!(opts, :host),
       event_capacity: Keyword.get(opts, :event_capacity, 1024),
-      polling_timeout: Keyword.get(opts, :polling_timeout, 10),
-      sock: nil
+      polling_timeout: Keyword.get(opts, :polling_timeout, 10)
     }
   end
 
@@ -170,16 +148,6 @@ defmodule Requiem.Transport.RustUDP do
     else
       %{state | dispatcher_index: state.dispatcher_index + 1}
     end
-  end
-
-  defp send_packet(sock, address, packet) do
-    Tracer.trace(__MODULE__, "send packet")
-
-    QUIC.Socket.send(
-      sock,
-      address.raw,
-      packet
-    )
   end
 
   defp name(handler),

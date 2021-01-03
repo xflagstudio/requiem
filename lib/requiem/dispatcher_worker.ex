@@ -8,14 +8,13 @@ defmodule Requiem.DispatcherWorker do
   alias Requiem.ConnectionID
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherRegistry
-  alias Requiem.SenderRegistry
   alias Requiem.QUIC
   alias Requiem.RetryToken
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
-          sender: {module, non_neg_integer},
+          transport: module,
           token_secret: binary,
           conn_id_secret: binary,
           worker_index: non_neg_integer,
@@ -24,7 +23,7 @@ defmodule Requiem.DispatcherWorker do
         }
 
   defstruct handler: nil,
-            sender: nil,
+            transport: nil,
             token_secret: "",
             conn_id_secret: "",
             worker_index: 0,
@@ -117,22 +116,16 @@ defmodule Requiem.DispatcherWorker do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
       worker_index: Keyword.fetch!(opts, :worker_index),
-      sender: Keyword.fetch!(opts, :sender),
+      transport: Keyword.fetch!(opts, :transport),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
       trace_id: inspect(self())
     }
   end
 
-  defp send(address, packet, %__MODULE__{handler: handler, sender: {sender, num}}) do
-    case SenderRegistry.lookup(handler, :rand.uniform(num) - 1) do
-      {:ok, pid} ->
-        sender.send(pid, address, packet)
-
-      {:error, :not_found} ->
-        Logger.error("<Requiem.DispatcherWorker> failed to send, sender-process not found")
-        {:error, :not_found}
-    end
+  defp send(address, packet, %__MODULE__{handler: handler, transport: transport}) do
+    transport.send(handler, address, packet)
+    :ok
   end
 
   defp handle_regular_packet(address, packet, _scid, dcid, state)
@@ -188,7 +181,7 @@ defmodule Requiem.DispatcherWorker do
 
         case create_connection_if_needed(
                state.handler,
-               state.sender,
+               state.transport,
                address,
                scid,
                dcid,
@@ -227,14 +220,14 @@ defmodule Requiem.DispatcherWorker do
     end
   end
 
-  defp create_connection_if_needed(_handler, _sender, _address, _scid, <<>>, _odcid) do
+  defp create_connection_if_needed(_handler, _transport, _address, _scid, <<>>, _odcid) do
     :ok
   end
 
-  defp create_connection_if_needed(handler, sender, address, scid, dcid, odcid) do
+  defp create_connection_if_needed(handler, transport, address, scid, dcid, odcid) do
     ConnectionSupervisor.create_connection(
       handler,
-      sender,
+      transport,
       address,
       scid,
       dcid,
