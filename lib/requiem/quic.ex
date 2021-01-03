@@ -9,8 +9,15 @@ defmodule Requiem.QUIC do
   def setup(handler) do
     stream_buffer_pool_size = Config.get(handler, :stream_buffer_pool_size)
     stream_buffer_size = Config.get(handler, :stream_buffer_size)
-    init(handler, stream_buffer_pool_size, stream_buffer_size)
-    init_config(handler)
+
+    case init(handler, stream_buffer_pool_size, stream_buffer_size) do
+      :ok ->
+        init_config(handler)
+        :ok
+
+      {:error, :system_error} ->
+        {:error, :system_error}
+    end
   end
 
   @spec init(module) :: :ok | {:error, :system_error}
