@@ -77,7 +77,26 @@ defmodule Requiem.DispatcherWorker do
   end
 
   @impl GenServer
+  def handle_info({:__packet__, peer, packet}, state) do
+    Tracer.trace(__MODULE__, "@received")
+    address = Address.from_rust_peer(peer)
+    process_packet(address, packet, state)
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:packet, address, packet}, state) do
+    process_packet(address, packet, state)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    DispatcherRegistry.unregister(state.handler, state.worker_index)
+    :ok
+  end
+
+  defp process_packet(address, packet, state) do
     case QUIC.Packet.parse_header(packet) do
       {:ok, scid, dcid, _token, _version, :initial, false} ->
         Tracer.trace(__MODULE__, state.trace_id, "@unsupported_version")
@@ -102,14 +121,6 @@ defmodule Requiem.DispatcherWorker do
 
         :ok
     end
-
-    {:noreply, state}
-  end
-
-  @impl GenServer
-  def terminate(_reason, state) do
-    DispatcherRegistry.unregister(state.handler, state.worker_index)
-    :ok
   end
 
   defp new(opts) do

@@ -2,7 +2,7 @@ use rustler::env::OwnedEnv;
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
-use rustler::{Atom, Env, NifResult, ResourceArc};
+use rustler::{Atom, Env, ListIterator, NifResult, ResourceArc};
 
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
@@ -42,6 +42,7 @@ pub struct Socket {
     poll: Poll,
     events: Events,
     buf: [u8; 65535],
+    target_index: usize,
 }
 
 impl Socket {
@@ -62,10 +63,11 @@ impl Socket {
             poll: poll,
             events: events,
             buf: buf,
+            target_index: 0,
         }
     }
 
-    pub fn poll(&mut self, env: &Env, pid: &LocalPid, interval: u64) {
+    pub fn poll(&mut self, env: &Env, pid: &LocalPid, target_pids: &[LocalPid], interval: u64) {
         let timeout = time::Duration::from_millis(interval);
         self.poll.poll(&mut self.events, Some(timeout)).unwrap();
 
@@ -101,11 +103,13 @@ impl Socket {
                         return;
                     }
 
+                    //let target_pid = self.choose_target_pid(target_pids);
                     let mut packet = OwnedBinary::new(len).unwrap();
                     packet.as_mut_slice().copy_from_slice(&self.buf[..len]);
 
                     env.send(
-                        pid,
+                        &target_pids[self.target_index],
+                        //&target_pid,
                         make_tuple(
                             *env,
                             &[
@@ -115,6 +119,12 @@ impl Socket {
                             ],
                         ),
                     );
+
+                    if self.target_index >= target_pids.len() - 1 {
+                        self.target_index = 0;
+                    } else {
+                        self.target_index += 1;
+                    }
                 }
                 _ => {}
             }
@@ -127,10 +137,16 @@ pub fn socket_open(
     module: Binary,
     address: Binary,
     pid: LocalPid,
+    target_pids: ListIterator,
     event_capacity: u64,
     poll_interval: u64,
 ) -> NifResult<Atom> {
     let module = module.as_slice();
+
+    let targets: Vec<LocalPid> = match target_pids.map(|x| x.decode::<LocalPid>()).collect() {
+        Ok(v) => v,
+        Err(_) => return Err(common::error_term(atoms::system_error())),
+    };
 
     let address = str::from_utf8(address.as_slice()).unwrap();
 
@@ -150,7 +166,7 @@ pub fn socket_open(
             if *should_close {
                 break;
             }
-            receiver.poll(&env, &pid, poll_interval);
+            receiver.poll(&env, &pid, &targets, poll_interval);
         })
     });
 

@@ -55,6 +55,7 @@ defmodule Requiem.Transport.RustUDP do
            state.host,
            state.port,
            self(),
+           dispatchers,
            capacity,
            timeout
          ) do
