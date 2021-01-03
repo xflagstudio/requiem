@@ -32,7 +32,8 @@ defmodule Requiem.Transport.RustUDP do
             polling_timeout: 0
 
   def send(handler, address, packet) do
-    handler |> name() |> GenServer.cast({:send, address, packet})
+    Tracer.trace(__MODULE__, "@send")
+    QUIC.Socket.send(handler, address.raw, packet)
   end
 
   def start_link(opts) do
@@ -66,13 +67,6 @@ defmodule Requiem.Transport.RustUDP do
 
         {:stop, :normal}
     end
-  end
-
-  @impl GenServer
-  def handle_cast({:send, address, packet}, state) do
-    Tracer.trace(__MODULE__, "@send")
-    send_packet(state.handler, address, packet)
-    {:noreply, state}
   end
 
   @impl GenServer
@@ -154,16 +148,6 @@ defmodule Requiem.Transport.RustUDP do
     else
       %{state | dispatcher_index: state.dispatcher_index + 1}
     end
-  end
-
-  defp send_packet(handler, address, packet) do
-    Tracer.trace(__MODULE__, "send packet")
-
-    QUIC.Socket.send(
-      handler,
-      address.raw,
-      packet
-    )
   end
 
   defp name(handler),
