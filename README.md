@@ -1,12 +1,11 @@
 # ReQUIem
 
----
-
+```
 This library is currently in an experimental phase. We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
+```
 
----
 
-This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
+This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.[^1]
 
 - https://w3c.github.io/webtransport/
 - https://tools.ietf.org/html/draft-vvv-webtransport-quic-02
