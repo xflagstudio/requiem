@@ -278,6 +278,9 @@ config :my_app, MyApp.MyHandler,
   enable_dgram: true
 ```
 
+Once you have done this, you can open the [WebTransport example page](https://googlechrome.github.io/samples/webtransport/client.html) in Google Chrome and try to interact with it.
+
+
 For more information on the various callbacks and the various functions that can be called from here, see [Handler](https://github.com/xflagstudio/requiem/wiki/Handler).
 
 ## Examples
