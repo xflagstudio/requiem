@@ -280,6 +280,11 @@ config :my_app, MyApp.MyHandler,
 
 For more information on the various callbacks and the various functions that can be called from here, see [Handler](https://github.com/xflagstudio/requiem/wiki/Handler).
 
+## Examples
+
+This repository contains an example project that can be used as a reference.
+Check inside the `examples` directory.
+
 ## Handler
 
 https://github.com/xflagstudio/requiem/wiki/Handler
