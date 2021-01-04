@@ -298,7 +298,7 @@ https://github.com/xflagstudio/requiem/wiki/Configuration
 
 ## LICENSE
 
-MITE-LICENSE
+MIT-LICENSE
 
 Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
 
