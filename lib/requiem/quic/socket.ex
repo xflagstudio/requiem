@@ -2,7 +2,7 @@ defmodule Requiem.QUIC.Socket do
   alias Requiem.QUIC.NIF
 
   @spec open(module, binary, non_neg_integer, pid, [pid], non_neg_integer, non_neg_integer) ::
-          :ok | {:error, :system_error}
+          :ok | {:error, :system_error | :cant_bind}
   def open(handler, host, port, pid, target_pids, event_capacity, poll_interval) do
     handler
     |> to_string()

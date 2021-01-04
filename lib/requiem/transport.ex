@@ -52,10 +52,17 @@ defmodule Requiem.Transport do
         Process.flag(:trap_exit, true)
         {:ok, state}
 
-      {:error, reason} ->
+      {:error, :cant_bind} ->
         Logger.error(
-          "<Requiem.Transport> failed to open UDP port #{to_string(port)}: #{inspect(reason)}"
+          "<Requiem.Transport> failed to bind UDP port, make sure that the values for this host(#{
+            host
+          }) and port(#{port}) are correct and that the port(#{port}) is not already in use."
         )
+
+        {:stop, :normal}
+
+      {:error, :system_error} ->
+        Logger.error("<Requiem.Transport> failed to open UDP port #{to_string(port)}")
 
         {:stop, :normal}
     end

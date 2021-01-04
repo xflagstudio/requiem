@@ -8,6 +8,7 @@ pub(crate) mod atoms {
         system_error,
         socket_error,
         cant_receive,
+        cant_bind,
         already_exists,
         already_closed,
         bad_format,

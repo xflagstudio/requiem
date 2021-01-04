@@ -168,7 +168,11 @@ pub fn socket_open(
 
     let address = str::from_utf8(address.as_slice()).unwrap();
 
-    let std_sock = std::net::UdpSocket::bind(address).unwrap();
+    let std_sock = match std::net::UdpSocket::bind(address) {
+        Ok(v) => v,
+        Err(_) => return Err(common::error_term(atoms::cant_bind())),
+    };
+
     let std_sock2 = std_sock.try_clone().unwrap();
 
     let closer = Arc::new(RwLock::new(false));

@@ -133,7 +133,7 @@ defmodule Requiem.QUIC.NIF do
   def packet_build_retry(_buffer, _scid, _dcid, _new_scid, _token, _version), do: error()
 
   @spec socket_open(binary, binary, pid, [pid], non_neg_integer, non_neg_integer) ::
-          :ok | {:error, :system_error}
+          :ok | {:error, :system_error | :cant_bind}
   def socket_open(_module, _address, _pid, _target_pids, _event_capacity, _poll_interval),
     do: error()
 
