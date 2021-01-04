@@ -49,6 +49,7 @@ defmodule Requiem.Config do
     allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
+    max_udp_payload_size: 1350,
     dgram_queue_size: 1000,
     max_idle_timeout: 60_000,
     socket_event_capacity: 1024,

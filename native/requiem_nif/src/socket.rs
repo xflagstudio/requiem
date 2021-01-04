@@ -99,11 +99,6 @@ impl Socket {
                         continue;
                     }
 
-                    if len > 1350 {
-                        // too big packet. ignore
-                        continue;
-                    }
-
                     match quiche::Header::from_slice(&mut self.buf[..len], quiche::MAX_CONN_ID_LEN)
                     {
                         Ok(hdr) => {
