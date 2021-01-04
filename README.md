@@ -1,9 +1,9 @@
 # ReQUIem
 
-```
-This library is currently in an experimental phase. We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
-```
 
+This library is currently in an experimental phase. We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
+
+---
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.[^1]
 
