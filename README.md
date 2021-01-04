@@ -1,11 +1,5 @@
 # ReQUIem
 
-## Note
-
-This library is currently in an experimental phase. 
-
-We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
-
 ## Description
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
@@ -22,6 +16,11 @@ ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge betw
 Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
 (it also accepts **draft-27** or **draft-28** QUIC frames)
 
+## Note
+
+This library is currently in an experimental phase.
+
+We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
 
 ## Installation
 
@@ -41,7 +40,6 @@ and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/requiem](https://hexdocs.pm/requiem).
 
 ## Getting Started
-
 
 ### Resource preparation
 
