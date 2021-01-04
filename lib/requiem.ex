@@ -18,6 +18,8 @@ defmodule Requiem do
             ) ::
               {:noreply, Requiem.ConnectionState.t(), any}
               | {:noreply, Requiem.ConnectionState.t(), any, timeout | :hibernate}
+              | {:reply, any, Requiem.ConnectionState.t(), any}
+              | {:reply, any, Requiem.ConnectionState.t(), any, timeout | :hibernate}
               | {:stop, non_neg_integer, atom}
 
   @callback handle_info(
@@ -61,7 +63,7 @@ defmodule Requiem do
               reason :: terminate_reason,
               conn :: Requiem.ConnectionState.t(),
               state :: any
-            ) :: :ok
+            ) :: any
 
   defmacro __using__(opts \\ []) do
     quote location: :keep, bind_quoted: [opts: opts] do
@@ -105,10 +107,10 @@ defmodule Requiem do
       def handle_call(_event, _from, conn, state), do: {:reply, :ok, conn, state}
 
       @impl Requiem
-      def handle_stream(stream_id, data, conn, state), do: {:ok, conn, state}
+      def handle_stream(_stream_id, _data, conn, state), do: {:ok, conn, state}
 
       @impl Requiem
-      def handle_dgram(data, conn, state), do: {:ok, conn, state}
+      def handle_dgram(_data, conn, state), do: {:ok, conn, state}
 
       @impl Requiem
       def terminate(_reason, _conn, _state), do: :ok

@@ -39,7 +39,15 @@ defmodule Requiem.ConnectionSupervisor do
   def lookup_connection(handler, dcid, _address, _allow_address_routing),
     do: ConnectionRegistry.lookup(handler, dcid)
 
-  @spec create_connection(module, {module, non_neg_integer}, Address.t(), binary, binary, binary, boolean) ::
+  @spec create_connection(
+          module,
+          {module, non_neg_integer},
+          Address.t(),
+          binary,
+          binary,
+          binary,
+          boolean
+        ) ::
           :ok | {:error, :system_error}
   def create_connection(handler, transport, address, scid, dcid, odcid, allow_address_routing) do
     Tracer.trace(__MODULE__, "create cnonection: DCID:#{Base.encode16(dcid)}")
