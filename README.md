@@ -1,9 +1,10 @@
 # ReQUIem
 
+## Note
 
 This library is currently in an experimental phase. We plan to ensure its stability by conducting sufficient interoperability and performance tests in the future.
 
----
+## Description
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.[^1]
 
@@ -51,7 +52,11 @@ https://github.com/xflagstudio/requiem/wiki/Configuration
 
 ## LICENSE
 
-MIT-LICENSE
+MITE-LICENSE
+
+Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
+
+Take a look at [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for more detail.
 
 ## Author
 
