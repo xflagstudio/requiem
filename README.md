@@ -8,7 +8,7 @@ We plan to ensure its stability by conducting sufficient interoperability and pe
 
 ## Description
 
-This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.[^1]
+This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
 
 - https://w3c.github.io/webtransport/
 - https://tools.ietf.org/html/draft-vvv-webtransport-quic-02
