@@ -58,7 +58,7 @@ MITE-LICENSE
 
 Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
 
-Take a look at [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for more detail.
+See [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for  details.
 
 ## Author
 
