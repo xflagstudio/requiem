@@ -46,12 +46,6 @@ defmodule Requiem.DispatcherWorker do
     }
   end
 
-  @spec dispatch(pid, Address.t(), iodata()) :: :ok
-  def dispatch(pid, address, packet) do
-    GenServer.cast(pid, {:packet, address, packet})
-    :ok
-  end
-
   @spec start_link(Keyword.t()) :: GenServer.on_start()
   def start_link(opts) do
     handler = Keyword.fetch!(opts, :handler)
@@ -99,30 +93,6 @@ defmodule Requiem.DispatcherWorker do
       is_version_supported,
       state
     )
-
-    {:noreply, state}
-  end
-
-  @impl GenServer
-  def handle_cast({:packet, address, packet}, state) do
-    # this comes from Transport.GenUDP
-    case QUIC.Packet.parse_header(packet) do
-      {:error, reason} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@bad_packet:#{inspect(reason)}, ignore")
-
-      {:ok, scid, dcid, token, version, packet_type, is_version_supported} ->
-        process_packet(
-          address,
-          packet,
-          scid,
-          dcid,
-          token,
-          version,
-          packet_type,
-          is_version_supported,
-          state
-        )
-    end
 
     {:noreply, state}
   end

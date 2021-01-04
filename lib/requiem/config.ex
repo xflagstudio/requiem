@@ -7,7 +7,6 @@ defmodule Requiem.Config do
           :web_transport
           | :host
           | :port
-          | :sender_buffering_interval
           | :dispatcher_pool_size
           | :stream_buffer_pool_size
           | :stream_buffer_size
@@ -44,7 +43,6 @@ defmodule Requiem.Config do
     web_transport: true,
     host: "0.0.0.0",
     port: 443,
-    sender_buffering_interval: 0,
     dispatcher_pool_size: 10,
     stream_buffer_pool_size: 10,
     stream_buffer_size: 1024 * 1024,
@@ -61,7 +59,6 @@ defmodule Requiem.Config do
     web_transport: true,
     port: true,
     host: true,
-    sender_buffering_interval: true,
     dispatcher_pool_size: true,
     stream_buffer_pool_size: true,
     stream_buffer_size: true,
