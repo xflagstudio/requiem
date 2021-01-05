@@ -302,6 +302,8 @@ Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
 
 See [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for  details.
 
-## Author
+## MAINTAINERS
 
-Lyo Kato <lyo.kato __at__ gmail.com>
+- Lyo Kato <lyo.kato __at__ gmail.com>
+- Hidetaka Kojo <hidetaka.kojo __at__ gmail.com>
+
