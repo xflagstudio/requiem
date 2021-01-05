@@ -87,20 +87,22 @@ impl Connection {
 
                 for s in self.conn.readable() {
                     while let Ok((len, _fin)) = self.conn.stream_recv(s, &mut buf) {
-                        let mut data = OwnedBinary::new(len).unwrap();
-                        data.as_mut_slice().copy_from_slice(&buf[..len]);
+                        if len > 0 {
+                            let mut data = OwnedBinary::new(len).unwrap();
+                            data.as_mut_slice().copy_from_slice(&buf[..len]);
 
-                        env.send(
-                            pid,
-                            make_tuple(
-                                *env,
-                                &[
-                                    atoms::__stream_recv__().to_term(*env),
-                                    s.encode(*env),
-                                    data.release(*env).to_term(*env),
-                                ],
-                            ),
-                        )
+                            env.send(
+                                pid,
+                                make_tuple(
+                                    *env,
+                                    &[
+                                        atoms::__stream_recv__().to_term(*env),
+                                        s.encode(*env),
+                                        data.release(*env).to_term(*env),
+                                    ],
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -162,19 +164,21 @@ impl Connection {
     fn handle_dgram(&mut self, env: &Env, pid: &LocalPid) {
         if self.conn.is_in_early_data() || self.conn.is_established() {
             while let Ok(len) = self.conn.dgram_recv(&mut self.buf) {
-                let mut data = OwnedBinary::new(len).unwrap();
-                data.as_mut_slice().copy_from_slice(&self.buf[..len]);
+                if len > 0 {
+                    let mut data = OwnedBinary::new(len).unwrap();
+                    data.as_mut_slice().copy_from_slice(&self.buf[..len]);
 
-                env.send(
-                    pid,
-                    make_tuple(
-                        *env,
-                        &[
-                            atoms::__dgram_recv__().to_term(*env),
-                            data.release(*env).to_term(*env),
-                        ],
-                    ),
-                );
+                    env.send(
+                        pid,
+                        make_tuple(
+                            *env,
+                            &[
+                                atoms::__dgram_recv__().to_term(*env),
+                                data.release(*env).to_term(*env),
+                            ],
+                        ),
+                    );
+                }
             }
         }
     }
