@@ -41,7 +41,6 @@ defmodule Requiem.MixProject do
       {:toml, "~> 0.5"},
       {:hkdf, "~> 0.1.0"},
       {:fastglobal, "~> 1.0"},
-      {:poolboy, "~> 1.5"},
       {:rustler, "~> 0.22.0-rc.0"}
     ]
   end
@@ -54,7 +53,7 @@ defmodule Requiem.MixProject do
         "Github" => "https://github.com/xflagstudio/requiem",
         "Docs" => "https://hexdocs.pm/requiem/Requiem.html"
       },
-      maintainers: ["Lyo Kato"]
+      maintainers: ["Lyo Kato", "Hidetaka Kojo"]
     ]
   end
 end
