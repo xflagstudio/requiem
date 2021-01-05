@@ -16,6 +16,8 @@ ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge betw
 Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
 (it also accepts **draft-27** or **draft-28** QUIC frames)
 
+- https://tools.ietf.org/html/draft-ietf-quic-transport-29
+
 ## Note
 
 This library is currently in an experimental phase.
@@ -30,7 +32,7 @@ by adding `requiem` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:requiem, "~> 0.1.0"}
+    {:requiem, "~> 0.1.1"}
   ]
 end
 ```
@@ -298,10 +300,12 @@ https://github.com/xflagstudio/requiem/wiki/Configuration
 
 MIT-LICENSE
 
-Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
+Copyright (C) 2021, [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
 
 See [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for  details.
 
-## Author
+## MAINTAINERS
 
-Lyo Kato <lyo.kato __at__ gmail.com>
+- Lyo Kato <lyo.kato __at__ gmail.com>
+- Hidetaka Kojo <hidetaka.kojo __at__ gmail.com>
+
