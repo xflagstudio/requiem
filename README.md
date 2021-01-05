@@ -300,7 +300,7 @@ https://github.com/xflagstudio/requiem/wiki/Configuration
 
 MIT-LICENSE
 
-Copyright 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
+Copyright (C) 2021 [XFLAG Studio (mixi, Inc.)](https://xflag.com/)
 
 See [LICENCE](https://github.com/xflagstudio/requiem/blob/develop/LICENSE) for  details.
 
