@@ -1,18 +1,45 @@
 defmodule Requiem.Address do
   use Bitwise
 
+  alias Requiem.QUIC
+
   @type t :: %__MODULE__{
           host: :inet.ip_address(),
-          port: :inet.port_number()
+          port: :inet.port_number(),
+          raw: nil | term
         }
 
-  defstruct host: nil, port: nil
+  defstruct host: nil, port: nil, raw: nil
 
-  @spec new(:inet.ip_address(), :inet.port_number()) :: t
-  def new(host, port) do
+  @spec from_rust_peer(term) :: t
+  def from_rust_peer(peer) do
+    {:ok, host, port} = QUIC.Socket.address_parts(peer)
+
+    if byte_size(host) == 4 do
+      <<n1, n2, n3, n4>> = host
+      new({n1, n2, n3, n4}, port, peer)
+    else
+      <<
+        n1::unsigned-integer-size(16),
+        n2::unsigned-integer-size(16),
+        n3::unsigned-integer-size(16),
+        n4::unsigned-integer-size(16),
+        n5::unsigned-integer-size(16),
+        n6::unsigned-integer-size(16),
+        n7::unsigned-integer-size(16),
+        n8::unsigned-integer-size(16)
+      >> = host
+
+      new({n1, n2, n3, n4, n5, n6, n7, n8}, port, peer)
+    end
+  end
+
+  @spec new(:inet.ip_address(), :inet.port_number(), term | nil) :: t
+  def new(host, port, raw \\ nil) do
     %__MODULE__{
       host: host,
-      port: port
+      port: port,
+      raw: raw
     }
   end
 

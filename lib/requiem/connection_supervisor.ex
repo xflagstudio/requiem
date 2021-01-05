@@ -3,7 +3,7 @@ defmodule Requiem.ConnectionSupervisor do
   Supervisor for all QUIC connection.
   """
 
-  require Logger
+  require Requiem.Tracer
 
   use DynamicSupervisor
 
@@ -11,6 +11,7 @@ defmodule Requiem.ConnectionSupervisor do
   alias Requiem.AddressTable
   alias Requiem.Connection
   alias Requiem.ConnectionRegistry
+  alias Requiem.Tracer
 
   @spec start_link(module) :: Supervisor.on_start()
   def start_link(handler) do
@@ -23,34 +24,9 @@ defmodule Requiem.ConnectionSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  @spec dispatch_packet(module, Address.t(), binary, binary, binary, boolean) :: :ok
-  def dispatch_packet(handler, address, packet, _scid, dcid, trace) do
-    Logger.debug(
-      "<Requiem.ConectionSupervisor> loopup from registry: dcid:#{Base.encode16(dcid)}"
-    )
-
-    case lookup_connection(handler, dcid, address) do
-      {:ok, pid} ->
-        Logger.debug(
-          "<Requiem.ConnectionSupervisor> found connection, pass packet to this process"
-        )
-
-        Connection.process_packet(pid, address, packet)
-        :ok
-
-      {:error, :not_found} ->
-        if trace do
-          Logger.debug(
-            "<Requiem.ConnectionSupervisor> connection for #{Base.encode16(dcid)} not found, ignore"
-          )
-        end
-
-        :ok
-    end
-  end
-
-  @spec lookup_connection(module, binary, Address.t()) :: {:ok, binary} | {:error, :not_found}
-  def lookup_connection(handler, <<>>, address) do
+  @spec lookup_connection(module, binary, Address.t(), boolean) ::
+          {:ok, pid} | {:error, :not_found}
+  def lookup_connection(handler, <<>>, address, true) do
     case AddressTable.lookup(handler, address) do
       {:ok, dcid} ->
         ConnectionRegistry.lookup(handler, dcid)
@@ -60,12 +36,21 @@ defmodule Requiem.ConnectionSupervisor do
     end
   end
 
-  def lookup_connection(handler, dcid, _address), do: ConnectionRegistry.lookup(handler, dcid)
+  def lookup_connection(handler, dcid, _address, _allow_address_routing),
+    do: ConnectionRegistry.lookup(handler, dcid)
 
-  @spec create_connection(module, module, Address.t(), binary, binary, binary, boolean) ::
+  @spec create_connection(
+          module,
+          {module, non_neg_integer},
+          Address.t(),
+          binary,
+          binary,
+          binary,
+          boolean
+        ) ::
           :ok | {:error, :system_error}
-  def create_connection(handler, transport, address, scid, dcid, odcid, trace) do
-    Logger.debug("<Requiem.ConnectionSupervisor> create cnonection: DCID:#{Base.encode16(dcid)}")
+  def create_connection(handler, transport, address, scid, dcid, odcid, allow_address_routing) do
+    Tracer.trace(__MODULE__, "create cnonection: DCID:#{Base.encode16(dcid)}")
 
     case ConnectionRegistry.lookup(handler, dcid) do
       {:error, :not_found} ->
@@ -76,16 +61,15 @@ defmodule Requiem.ConnectionSupervisor do
           dcid: dcid,
           scid: scid,
           odcid: odcid,
-          trace: trace
+          allow_address_routing: allow_address_routing
         ]
 
         case start_child(opts) do
           {:error, reason} ->
-            if trace do
-              Logger.info(
-                "<Requiem.ConnectionSupervisor> failed to start connection: #{inspect(reason)}"
-              )
-            end
+            Tracer.trace(
+              __MODULE__,
+              "<Requiem.ConnectionSupervisor> failed to start connection: #{inspect(reason)}"
+            )
 
             {:error, :system_error}
 
@@ -94,9 +78,7 @@ defmodule Requiem.ConnectionSupervisor do
         end
 
       {:ok, _pid} ->
-        if trace do
-          Logger.info("<Requiem.ConnectionSupervisor> connection already exists")
-        end
+        Tracer.trace(__MODULE__, "<Requiem.ConnectionSupervisor> connection already exists")
 
         :ok
     end

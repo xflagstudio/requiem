@@ -2,6 +2,24 @@ defmodule Requiem.StreamId do
   @type orientation :: :bidi | :uni
   @type initiator :: :server | :client
 
+  @spec is_readable?(non_neg_integer) :: boolean
+  def is_readable?(stream_id) do
+    case classify(stream_id) do
+      {:ok, _, :bidi} -> true
+      {:ok, :client, _} -> true
+      _ -> false
+    end
+  end
+
+  @spec is_writable?(non_neg_integer) :: boolean
+  def is_writable?(stream_id) do
+    case classify(stream_id) do
+      {:ok, _, :bidi} -> true
+      {:ok, :server, _} -> true
+      _ -> false
+    end
+  end
+
   @spec is_bidi?(non_neg_integer) :: boolean
   def is_bidi?(stream_id) do
     case classify(stream_id) do
@@ -51,7 +69,6 @@ defmodule Requiem.StreamId do
       0x01 -> {:ok, :server, :bidi}
       0x02 -> {:ok, :client, :uni}
       0x03 -> {:ok, :server, :uni}
-      _ -> :error
     end
   end
 end

@@ -8,9 +8,9 @@ defmodule Requiem.Supervisor do
   alias Requiem.QUIC
   alias Requiem.ConnectionRegistry
   alias Requiem.ConnectionSupervisor
-  alias Requiem.OutgoingPacket.SenderPool
-  alias Requiem.IncomingPacket.DispatcherPool
-  alias Requiem.Transport.GenUDP
+  alias Requiem.DispatcherSupervisor
+  alias Requiem.DispatcherRegistry
+  alias Requiem.Transport
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
   def child_spec(handler, otp_app) do
@@ -29,42 +29,39 @@ defmodule Requiem.Supervisor do
 
   @impl Supervisor
   def init([handler, otp_app]) do
-    handler |> QUIC.init()
-    handler |> Config.setup(otp_app)
-    handler |> AddressTable.init()
+    handler |> Config.init(otp_app)
+    handler |> QUIC.setup()
+
+    if handler |> Config.get(:allow_address_routing) do
+      handler |> AddressTable.init()
+    end
+
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
 
-  defp children(handler) do
-    trace = handler |> Config.get!(:trace)
-
+  @spec children(module) :: [:supervisor.child_spec() | {module, term} | module]
+  def children(handler) do
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
+      {Registry, keys: :unique, name: DispatcherRegistry.name(handler)},
       {ConnectionSupervisor, handler},
-      {SenderPool,
+      {DispatcherSupervisor,
        [
          handler: handler,
-         transport: GenUDP,
-         buffering_interval: handler |> Config.get!(:sender_buffering_interval),
-         pool_size: handler |> Config.get!(:sender_pool_size),
-         pool_max_overflow: handler |> Config.get!(:sender_pool_max_overflow)
+         transport: Transport,
+         token_secret: handler |> Config.get!(:token_secret),
+         conn_id_secret: handler |> Config.get!(:connection_id_secret),
+         number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
+         allow_address_routing: handler |> Config.get!(:allow_address_routing)
        ]},
-      {DispatcherPool,
+      {Transport,
        [
          handler: handler,
-         transport: SenderPool,
-         token_secret: handler |> Config.get!(:quic_token_secret),
-         conn_id_secret: handler |> Config.get!(:quic_connection_id_secret),
-         pool_size: handler |> Config.get!(:dispatcher_pool_size),
-         pool_max_overflow: handler |> Config.get!(:dispatcher_pool_max_overflow),
-         trace: trace
-       ]},
-      {GenUDP,
-       [
-         handler: handler,
-         dispatcher: DispatcherPool,
          port: handler |> Config.get!(:port),
-         trace: trace
+         number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
+         event_capacity: handler |> Config.get!(:socket_event_capacity),
+         host: handler |> Config.get!(:host),
+         polling_timeout: handler |> Config.get!(:socket_polling_timeout)
        ]}
     ]
   end

@@ -5,7 +5,7 @@ defmodule RequiemTest.ConnectionTest do
   alias Requiem.QUIC.Connection
 
   test "connection NIF" do
-    module = to_string(Module.concat(__MODULE__, Test1))
+    module = Module.concat(__MODULE__, Test1)
 
     scid = :crypto.strong_rand_bytes(20)
     odcid = :crypto.strong_rand_bytes(20)
@@ -21,7 +21,7 @@ defmodule RequiemTest.ConnectionTest do
   end
 
   test "multiple connection state" do
-    module = to_string(Module.concat(__MODULE__, Test2))
+    module = Module.concat(__MODULE__, Test2)
     assert QUIC.init(module) == :ok
 
     scid1 = :crypto.strong_rand_bytes(20)

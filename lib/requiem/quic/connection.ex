@@ -8,7 +8,8 @@ defmodule Requiem.QUIC.Connection do
     |> NIF.connection_accept(scid, odcid)
   end
 
-  @spec close(term, boolean, non_neg_integer, binary) :: :ok | {:error, :system_error}
+  @spec close(term, boolean, non_neg_integer, binary) ::
+          :ok | {:error, :system_error | :already_closed}
   def close(conn, app, err, reason) do
     NIF.connection_close(self(), conn, app, err, reason)
   end

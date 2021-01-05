@@ -8,18 +8,19 @@ defmodule Requiem.QUIC.Packet do
     NIF.packet_parse_header(packet)
   end
 
-  @spec build_negotiate_version(module, binary, binary) :: {:ok, binary} | {:error, :system_error}
-  def build_negotiate_version(module, scid, dcid) do
-    module
-    |> to_string()
-    |> NIF.packet_build_negotiate_version(scid, dcid)
+  @spec create_buffer() :: {:ok, term} | {:error, :system_error}
+  def create_buffer() do
+    NIF.packet_build_buffer_create()
   end
 
-  @spec build_retry(module, binary, binary, binary, binary, non_neg_integer) ::
+  @spec build_negotiate_version(term, binary, binary) :: {:ok, binary} | {:error, :system_error}
+  def build_negotiate_version(buffer, scid, dcid) do
+    NIF.packet_build_negotiate_version(buffer, scid, dcid)
+  end
+
+  @spec build_retry(term, binary, binary, binary, binary, non_neg_integer) ::
           {:ok, binary} | {:error, :system_error}
-  def build_retry(module, scid, dcid, new_scid, token, version) do
-    module
-    |> to_string()
-    |> NIF.packet_build_retry(scid, dcid, new_scid, token, version)
+  def build_retry(buffer, scid, dcid, new_scid, token, version) do
+    NIF.packet_build_retry(buffer, scid, dcid, new_scid, token, version)
   end
 end

@@ -1,8 +1,9 @@
 defmodule Requiem.QUIC.NIF do
   use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
-  @spec quic_init(binary) :: :ok | {:error, :system_error}
-  def quic_init(_module), do: error()
+  @spec quic_init(binary, non_neg_integer, non_neg_integer) ::
+          :ok | {:error, :system_error}
+  def quic_init(_module, _stream_buffer_num, _stream_buffer_size), do: error()
 
   @spec config_load_cert_chain_from_pem_file(binary, binary) ::
           :ok | {:error, :system_error | :not_found}
@@ -92,7 +93,7 @@ defmodule Requiem.QUIC.NIF do
   def connection_accept(_module, _scid, _odcid), do: error()
 
   @spec connection_close(pid, term, boolean, non_neg_integer, binary) ::
-          :ok | {:error, :system_error}
+          :ok | {:error, :system_error | :already_closed}
   def connection_close(_pid, _conn, _app, _err, _reason), do: error()
 
   @spec connection_is_closed(term) :: boolean
@@ -119,13 +120,34 @@ defmodule Requiem.QUIC.NIF do
           | {:error, :system_error | :bad_format}
   def packet_parse_header(_packet), do: error()
 
-  @spec packet_build_negotiate_version(binary, binary, binary) ::
-          {:ok, binary} | {:error, :system_error}
-  def packet_build_negotiate_version(_module, _scid, _dcid), do: error()
+  @spec packet_build_buffer_create() ::
+          {:ok, term} | {:error, :system_error}
+  def packet_build_buffer_create(), do: error()
 
-  @spec packet_build_retry(binary, binary, binary, binary, binary, non_neg_integer) ::
+  @spec packet_build_negotiate_version(term, binary, binary) ::
           {:ok, binary} | {:error, :system_error}
-  def packet_build_retry(_module, _scid, _dcid, _new_scid, _token, _version), do: error()
+  def packet_build_negotiate_version(_buffer, _scid, _dcid), do: error()
+
+  @spec packet_build_retry(term, binary, binary, binary, binary, non_neg_integer) ::
+          {:ok, binary} | {:error, :system_error}
+  def packet_build_retry(_buffer, _scid, _dcid, _new_scid, _token, _version), do: error()
+
+  @spec socket_open(binary, binary, pid, [pid], non_neg_integer, non_neg_integer) ::
+          :ok | {:error, :system_error | :cant_bind}
+  def socket_open(_module, _address, _pid, _target_pids, _event_capacity, _poll_interval),
+    do: error()
+
+  @spec socket_send(binary, term, binary) ::
+          :ok | {:error, :system_error | :not_found}
+  def socket_send(_module, _addr, _packet), do: error()
+
+  @spec socket_close(binary) ::
+          :ok | {:error, :system_error | :not_found}
+  def socket_close(_module), do: error()
+
+  @spec socket_address_parts(term) ::
+          {:ok, binary, non_neg_integer}
+  def socket_address_parts(_address), do: error()
 
   defp error(), do: :erlang.nif_error(:nif_not_loaded)
 end
