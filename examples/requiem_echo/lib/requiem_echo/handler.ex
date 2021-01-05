@@ -10,6 +10,24 @@ defmodule RequiemEcho.Handler do
   end
 
   @impl Requiem
+  def handle_info(_request, conn, state) do
+    Logger.debug("<Handler> handle_info")
+    {:noreply, conn, state}
+  end
+
+  @impl Requiem
+  def handle_cast(_request, conn, state) do
+    Logger.debug("<Handler> handle_cast")
+    {:noreply, conn, state}
+  end
+
+  @impl Requiem
+  def handle_call(_request, _from, conn, state) do
+    Logger.debug("<Handler> handle_call")
+    {:reply, :ok, conn, state}
+  end
+
+  @impl Requiem
   def handle_stream(stream_id, data, conn, state) do
     Logger.debug("<Handler> handle_stream(#{stream_id}, #{data})")
 

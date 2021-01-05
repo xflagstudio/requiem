@@ -9,7 +9,6 @@ defmodule Requiem.Config do
           | :port
           | :dispatcher_pool_size
           | :stream_buffer_pool_size
-          | :stream_buffer_size
           | :socket_event_capacity
           | :socket_polling_timeout
           | :allow_address_routing
@@ -45,13 +44,19 @@ defmodule Requiem.Config do
     port: 443,
     dispatcher_pool_size: 10,
     stream_buffer_pool_size: 10,
-    stream_buffer_size: 1024 * 1024,
     allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
     max_udp_payload_size: 1350,
+    initial_max_data: 1_000_000,
+    initial_max_stream_data_bidi_local: 100_000,
+    initial_max_stream_data_bidi_remote: 100_000,
+    initial_max_stream_data_uni: 100_000,
+    initial_max_streams_bidi: 1,
+    initial_max_streams_uni: 2,
     dgram_queue_size: 1000,
     max_idle_timeout: 60_000,
+    disable_active_migration: true,
     socket_event_capacity: 1024,
     socket_polling_timeout: 100
   ]
@@ -62,7 +67,6 @@ defmodule Requiem.Config do
     host: true,
     dispatcher_pool_size: true,
     stream_buffer_pool_size: true,
-    stream_buffer_size: true,
     allow_address_routing: true,
     socket_event_capacity: true,
     socket_polling_timeout: true,

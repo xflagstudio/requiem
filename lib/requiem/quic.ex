@@ -8,7 +8,11 @@ defmodule Requiem.QUIC do
           :ok | {:error, :system_error}
   def setup(handler) do
     stream_buffer_pool_size = Config.get(handler, :stream_buffer_pool_size)
-    stream_buffer_size = Config.get(handler, :stream_buffer_size)
+    stream_buffer_size = [
+      Config.get(handler, :initial_max_stream_data_bidi_local),
+      Config.get(handler, :initial_max_stream_data_uni),
+      100_000
+    ] |> Enum.max()
 
     case init(handler, stream_buffer_pool_size, stream_buffer_size) do
       :ok ->
