@@ -1,7 +1,5 @@
 # ReQUIem
 
-![requiem](https://www.monster-strike.com/entryimage/BRPqMhmX20200305_3c.png)
-
 ## Description
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
