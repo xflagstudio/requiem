@@ -55,6 +55,7 @@ rustler::init!(
         socket::socket_send,
         socket::socket_close,
         socket::socket_address_parts,
+        socket::socket_address_from_string,
     ],
     load = load
 );

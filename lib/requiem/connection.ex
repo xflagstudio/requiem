@@ -224,7 +224,8 @@ defmodule Requiem.Connection do
     case QUIC.Connection.accept(
            state.handler,
            state.conn_state.dcid,
-           state.conn_state.odcid
+           state.conn_state.odcid,
+           state.conn_state.address.raw
          ) do
       {:ok, conn} ->
         Tracer.trace(__MODULE__, state.trace_id, "@acccept: completed")

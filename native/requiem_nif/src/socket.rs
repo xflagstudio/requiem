@@ -145,13 +145,13 @@ impl Socket {
 }
 pub(crate) fn send_internal(
     module: &[u8],
-    peer: ResourceArc<Peer>,
-    packet: Binary,
+    peer: &ResourceArc<Peer>,
+    packet: &[u8],
 ) -> Result<(), Atom> {
     let socket_table = SOCKETS.read();
     if let Some(socket) = socket_table.get(module) {
         let socket = socket.lock();
-        match socket.send_to(packet.as_slice(), &peer.addr) {
+        match socket.send_to(packet, &peer.addr) {
             Ok(_size) => Ok(()),
             Err(_) => Err(atoms::system_error()),
         }
@@ -160,6 +160,17 @@ pub(crate) fn send_internal(
     }
 }
 
+#[rustler::nif]
+pub fn socket_address_from_string(address: Binary) -> NifResult<(Atom, ResourceArc<Peer>)> {
+    let addr = match str::from_utf8(address.as_slice()) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(common::error_term(atoms::bad_format()));
+        }
+    };
+    let addr: SocketAddr = addr.parse().unwrap();
+    Ok((atoms::ok(), ResourceArc::new(Peer::new(addr))))
+}
 
 #[rustler::nif]
 pub fn socket_open(
@@ -218,7 +229,7 @@ pub fn socket_open(
 
 #[rustler::nif]
 pub fn socket_send(module: Binary, peer: ResourceArc<Peer>, packet: Binary) -> NifResult<Atom> {
-    match send_internal(module.as_slice(), peer, packet) {
+    match send_internal(module.as_slice(), &peer, packet.as_slice()) {
         Ok(()) => Ok(atoms::ok()),
         Err(reason) => Err(common::error_term(reason)),
     }
