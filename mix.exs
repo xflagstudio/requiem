@@ -31,8 +31,8 @@ defmodule Requiem.MixProject do
   end
 
   defp rustc_mode(_), do: :release
-  #defp rustc_mode(:prod), do: :release
-  #defp rustc_mode(_), do: :debug
+  # defp rustc_mode(:prod), do: :release
+  # defp rustc_mode(_), do: :debug
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do

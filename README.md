@@ -1,5 +1,8 @@
 # ReQUIem
 
+[![hex.pm version](https://img.shields.io/hexpm/v/requiem.svg)](https://hex.pm/packages/requiem)
+[![hex.pm](https://img.shields.io/hexpm/l/requiem.svg)](https://github.com/xflagstudio/requiem/blob/master/LICENSE)
+
 ## Description
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.

@@ -88,13 +88,13 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error | :not_found}
   def config_enable_dgram(_module, _enabled, _recv_queue_len, _send_queue_len), do: error()
 
-  @spec connection_accept(binary, binary, binary) ::
+  @spec connection_accept(binary, binary, binary, term) ::
           {:ok, term} | {:error, :system_error | :not_found}
-  def connection_accept(_module, _scid, _odcid), do: error()
+  def connection_accept(_module, _scid, _odcid, _peer), do: error()
 
-  @spec connection_close(pid, term, boolean, non_neg_integer, binary) ::
+  @spec connection_close(term, boolean, non_neg_integer, binary) ::
           :ok | {:error, :system_error | :already_closed}
-  def connection_close(_pid, _conn, _app, _err, _reason), do: error()
+  def connection_close(_conn, _app, _err, _reason), do: error()
 
   @spec connection_is_closed(term) :: boolean
   def connection_is_closed(_conn), do: error()
@@ -103,17 +103,17 @@ defmodule Requiem.QUIC.NIF do
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_on_packet(_pid, _conn, _packet), do: error()
 
-  @spec connection_on_timeout(pid, term) ::
+  @spec connection_on_timeout(term) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_on_timeout(_pid, _conn), do: error()
+  def connection_on_timeout(_conn), do: error()
 
-  @spec connection_stream_send(pid, term, non_neg_integer, binary) ::
+  @spec connection_stream_send(term, non_neg_integer, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_stream_send(_pid, _conn, _stream_id, _data), do: error()
+  def connection_stream_send(_conn, _stream_id, _data), do: error()
 
-  @spec connection_dgram_send(pid, term, binary) ::
+  @spec connection_dgram_send(term, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_dgram_send(_pid, _conn, _data), do: error()
+  def connection_dgram_send(_conn, _data), do: error()
 
   @spec packet_parse_header(binary) ::
           {:ok, binary, binary, binary, non_neg_integer, atom, boolean}
@@ -148,6 +148,10 @@ defmodule Requiem.QUIC.NIF do
   @spec socket_address_parts(term) ::
           {:ok, binary, non_neg_integer}
   def socket_address_parts(_address), do: error()
+
+  @spec socket_address_from_string(binary) ::
+          {:ok, term} | {:error, :bad_format}
+  def socket_address_from_string(_address), do: error()
 
   defp error(), do: :erlang.nif_error(:nif_not_loaded)
 end

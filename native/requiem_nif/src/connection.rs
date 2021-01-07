@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use crate::common::{self, atoms};
 use crate::config::CONFIGS;
+use crate::socket::{self, Peer};
 
 type ModuleName = Vec<u8>;
 type BufferSlot = Vec<Mutex<Box<[u8]>>>;
@@ -39,14 +40,16 @@ pub fn buffer_init(module: &[u8], num: u64, size: usize) {
 pub struct Connection {
     module: Vec<u8>,
     conn: Pin<Box<quiche::Connection>>,
+    peer: ResourceArc<Peer>,
     buf: [u8; 1350],
 }
 
 impl Connection {
-    pub fn new(module: &[u8], conn: Pin<Box<quiche::Connection>>) -> Self {
+    pub fn new(module: &[u8], conn: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
         Connection {
             module: module.to_vec(),
             conn: conn,
+            peer: peer,
             buf: [0; 1350],
         }
     }
@@ -57,7 +60,7 @@ impl Connection {
                 Ok(_len) => {
                     self.handle_stream(env, pid);
                     self.handle_dgram(env, pid);
-                    self.drain(env, pid);
+                    self.drain();
                     Ok(self.next_timeout())
                 }
 
@@ -109,13 +112,7 @@ impl Connection {
         }
     }
 
-    fn stream_send(
-        &mut self,
-        env: &Env,
-        pid: &LocalPid,
-        stream_id: u64,
-        data: &[u8],
-    ) -> Result<u64, Atom> {
+    fn stream_send(&mut self, stream_id: u64, data: &[u8]) -> Result<u64, Atom> {
         let size = data.len();
 
         if !self.conn.is_closed() {
@@ -124,7 +121,7 @@ impl Connection {
                 match self.conn.stream_send(stream_id, &data[pos..], true) {
                     Ok(len) => {
                         pos += len;
-                        self.drain(env, pid);
+                        self.drain();
                         if pos >= size {
                             break;
                         }
@@ -144,11 +141,11 @@ impl Connection {
         }
     }
 
-    fn dgram_send(&mut self, env: &Env, pid: &LocalPid, data: &[u8]) -> Result<u64, Atom> {
+    fn dgram_send(&mut self, data: &[u8]) -> Result<u64, Atom> {
         if !self.conn.is_closed() {
             match self.conn.dgram_send(data) {
                 Ok(()) => {
-                    self.drain(env, pid);
+                    self.drain();
                     Ok(self.next_timeout())
                 }
 
@@ -183,10 +180,10 @@ impl Connection {
         }
     }
 
-    pub fn on_timeout(&mut self, env: &Env, pid: &LocalPid) -> Result<u64, Atom> {
+    pub fn on_timeout(&mut self) -> Result<u64, Atom> {
         if !self.conn.is_closed() {
             self.conn.on_timeout();
-            self.drain(env, pid);
+            self.drain();
             Ok(self.next_timeout())
         } else {
             Err(atoms::already_closed())
@@ -197,18 +194,11 @@ impl Connection {
         self.conn.is_closed()
     }
 
-    pub fn close(
-        &mut self,
-        env: &Env,
-        pid: &LocalPid,
-        app: bool,
-        err: u64,
-        reason: &[u8],
-    ) -> Result<(), Atom> {
+    pub fn close(&mut self, app: bool, err: u64, reason: &[u8]) -> Result<(), Atom> {
         if !self.conn.is_closed() {
             match self.conn.close(app, err, reason) {
                 Ok(()) => {
-                    self.drain(env, pid);
+                    self.drain();
                     Ok(())
                 }
 
@@ -221,23 +211,16 @@ impl Connection {
         }
     }
 
-    fn drain(&mut self, env: &Env, pid: &LocalPid) {
+    fn drain(&mut self) {
         loop {
             match self.conn.send(&mut self.buf) {
                 Ok(len) => {
-                    let mut data = OwnedBinary::new(len).unwrap();
-                    data.as_mut_slice().copy_from_slice(&self.buf[..len]);
-
-                    env.send(
-                        pid,
-                        make_tuple(
-                            *env,
-                            &[
-                                atoms::__drain__().to_term(*env),
-                                data.release(*env).to_term(*env),
-                            ],
-                        ),
-                    );
+                    match socket::send_internal(&self.module, &self.peer, &self.buf[..len]) {
+                        Ok(()) => {}
+                        Err(_) => {
+                            continue;
+                        }
+                    }
                 }
 
                 Err(quiche::Error::Done) => {
@@ -259,9 +242,9 @@ pub struct LockedConnection {
 }
 
 impl LockedConnection {
-    pub fn new(module: &[u8], raw: Pin<Box<quiche::Connection>>) -> Self {
+    pub fn new(module: &[u8], raw: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
         LockedConnection {
-            conn: Mutex::new(Connection::new(module, raw)),
+            conn: Mutex::new(Connection::new(module, raw, peer)),
         }
     }
 }
@@ -271,6 +254,7 @@ pub fn connection_accept(
     module: Binary,
     scid: Binary,
     odcid: Binary,
+    peer: ResourceArc<Peer>,
 ) -> NifResult<(Atom, ResourceArc<LockedConnection>)> {
     let module = module.as_slice();
     let scid = scid.as_slice();
@@ -284,7 +268,7 @@ pub fn connection_accept(
         match quiche::accept(scid, Some(odcid), &mut c) {
             Ok(conn) => Ok((
                 atoms::ok(),
-                ResourceArc::new(LockedConnection::new(module, conn)),
+                ResourceArc::new(LockedConnection::new(module, conn, peer)),
             )),
 
             Err(_) => Err(common::error_term(atoms::system_error())),
@@ -296,8 +280,6 @@ pub fn connection_accept(
 
 #[rustler::nif]
 pub fn connection_close(
-    env: Env,
-    pid: LocalPid,
     conn: ResourceArc<LockedConnection>,
     app: bool,
     err: u64,
@@ -305,7 +287,7 @@ pub fn connection_close(
 ) -> NifResult<Atom> {
     let mut conn = conn.conn.lock();
 
-    match conn.close(&env, &pid, app, err, reason.as_slice()) {
+    match conn.close(app, err, reason.as_slice()) {
         Ok(_) => Ok(atoms::ok()),
         Err(reason) => Err(common::error_term(reason)),
     }
@@ -334,14 +316,10 @@ pub fn connection_on_packet(
 }
 
 #[rustler::nif]
-pub fn connection_on_timeout(
-    env: Env,
-    pid: LocalPid,
-    conn: ResourceArc<LockedConnection>,
-) -> NifResult<(Atom, u64)> {
+pub fn connection_on_timeout(conn: ResourceArc<LockedConnection>) -> NifResult<(Atom, u64)> {
     let mut conn = conn.conn.lock();
 
-    match conn.on_timeout(&env, &pid) {
+    match conn.on_timeout() {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
@@ -349,14 +327,12 @@ pub fn connection_on_timeout(
 
 #[rustler::nif]
 pub fn connection_stream_send(
-    env: Env,
-    pid: LocalPid,
     conn: ResourceArc<LockedConnection>,
     stream_id: u64,
     data: Binary,
 ) -> NifResult<(Atom, u64)> {
     let mut conn = conn.conn.lock();
-    match conn.stream_send(&env, &pid, stream_id, data.as_slice()) {
+    match conn.stream_send(stream_id, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
@@ -364,13 +340,11 @@ pub fn connection_stream_send(
 
 #[rustler::nif]
 pub fn connection_dgram_send(
-    env: Env,
-    pid: LocalPid,
     conn: ResourceArc<LockedConnection>,
     data: Binary,
 ) -> NifResult<(Atom, u64)> {
     let mut conn = conn.conn.lock();
-    match conn.dgram_send(&env, &pid, data.as_slice()) {
+    match conn.dgram_send(data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
