@@ -256,7 +256,6 @@ defmodule Requiem.DispatcherWorker do
   defp create_connection_if_needed(address, scid, dcid, odcid, state) do
     ConnectionSupervisor.create_connection(
       state.handler,
-      state.transport,
       address,
       scid,
       dcid,

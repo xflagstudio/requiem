@@ -27,4 +27,9 @@ defmodule Requiem.QUIC.Socket do
   def address_parts(address) do
     NIF.socket_address_parts(address)
   end
+
+  @spec address_from_string(binary) :: {:ok, term} | {:error, :bad_format}
+  def address_from_string(address) do
+    NIF.socket_address_from_string(address)
+  end
 end
