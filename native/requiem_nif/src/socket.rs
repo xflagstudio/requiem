@@ -143,6 +143,23 @@ impl Socket {
         }
     }
 }
+pub(crate) fn send_internal(
+    module: &[u8],
+    peer: ResourceArc<Peer>,
+    packet: Binary,
+) -> Result<(), Atom> {
+    let socket_table = SOCKETS.read();
+    if let Some(socket) = socket_table.get(module) {
+        let socket = socket.lock();
+        match socket.send_to(packet.as_slice(), &peer.addr) {
+            Ok(_size) => Ok(()),
+            Err(_) => Err(atoms::system_error()),
+        }
+    } else {
+        Err(atoms::not_found())
+    }
+}
+
 
 #[rustler::nif]
 pub fn socket_open(
@@ -201,16 +218,9 @@ pub fn socket_open(
 
 #[rustler::nif]
 pub fn socket_send(module: Binary, peer: ResourceArc<Peer>, packet: Binary) -> NifResult<Atom> {
-    let module = module.as_slice();
-    let socket_table = SOCKETS.read();
-    if let Some(socket) = socket_table.get(module) {
-        let socket = socket.lock();
-        match socket.send_to(packet.as_slice(), &peer.addr) {
-            Ok(_size) => Ok(atoms::ok()),
-            Err(_) => Err(common::error_term(atoms::system_error())),
-        }
-    } else {
-        Err(common::error_term(atoms::not_found()))
+    match send_internal(module.as_slice(), peer, packet) {
+        Ok(()) => Ok(atoms::ok()),
+        Err(reason) => Err(common::error_term(reason)),
     }
 }
 
