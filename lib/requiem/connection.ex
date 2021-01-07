@@ -18,7 +18,6 @@ defmodule Requiem.Connection do
           handler_state: any,
           handler_initialized: boolean,
           allow_address_routing: boolean,
-          transport: module,
           trace_id: binary,
           web_transport: boolean,
           conn_state: ConnectionState.t(),
@@ -30,7 +29,6 @@ defmodule Requiem.Connection do
             handler_state: nil,
             handler_initialized: true,
             allow_address_routing: false,
-            transport: nil,
             trace_id: nil,
             web_transport: true,
             conn_state: nil,
@@ -472,12 +470,6 @@ defmodule Requiem.Connection do
     end
   end
 
-  def handle_info({:__drain__, data}, state) do
-    Tracer.trace(__MODULE__, state.trace_id, "@drain")
-    state.transport.send(state.handler, state.conn_state.address, data)
-    {:noreply, state}
-  end
-
   def handle_info({:EXIT, pid, reason}, state) do
     ExceptionGuard.guard(
       fn ->
@@ -690,7 +682,6 @@ defmodule Requiem.Connection do
       handler_state: nil,
       handler_initialized: false,
       allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
-      transport: Keyword.fetch!(opts, :transport),
       trace_id: trace_id,
       web_transport: Keyword.get(opts, :web_transport, true),
       conn_state: ConnectionState.new(address, dcid, scid, odcid),
