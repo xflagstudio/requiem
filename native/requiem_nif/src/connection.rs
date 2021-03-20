@@ -12,7 +12,6 @@ use std::pin::Pin;
 use std::collections::HashMap;
 
 use crate::common::{self, atoms};
-use crate::config::CONFIGS;
 use crate::socket::{self, Peer};
 
 type ModuleName = Vec<u8>;
@@ -252,6 +251,7 @@ impl LockedConnection {
 #[rustler::nif]
 pub fn connection_accept(
     module: Binary,
+    cptr: i64,
     scid: Binary,
     odcid: Binary,
     peer: ResourceArc<Peer>,
@@ -260,21 +260,18 @@ pub fn connection_accept(
     let scid = scid.as_slice();
     let odcid = odcid.as_slice();
 
-    let config_table = CONFIGS.read();
+    let cptr = cptr as *mut quiche::Config;
+    let c = unsafe { &mut *cptr };
 
-    if let Some(c) = config_table.get(module) {
-        let mut c = c.lock();
+    let scid = quiche::ConnectionId::from_ref(scid);
+    let odcid = quiche::ConnectionId::from_ref(odcid);
+    match quiche::accept(&scid, Some(&odcid), c) {
+        Ok(conn) => Ok((
+            atoms::ok(),
+            ResourceArc::new(LockedConnection::new(module, conn, peer)),
+        )),
 
-        match quiche::accept(scid, Some(odcid), &mut c) {
-            Ok(conn) => Ok((
-                atoms::ok(),
-                ResourceArc::new(LockedConnection::new(module, conn, peer)),
-            )),
-
-            Err(_) => Err(common::error_term(atoms::system_error())),
-        }
-    } else {
-        Err(common::error_term(atoms::not_found()))
+        Err(_) => Err(common::error_term(atoms::system_error())),
     }
 }
 

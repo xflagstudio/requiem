@@ -11,13 +11,15 @@ mod socket;
 fn quic_init(module: Binary, stream_buffer_num: u64, stream_buffer_size: usize) -> NifResult<Atom> {
     let module = module.as_slice();
     connection::buffer_init(&module, stream_buffer_num, stream_buffer_size);
-    config::config_init(&module)
+    Ok(common::atoms::ok())
 }
 
 rustler::init!(
     "Elixir.Requiem.QUIC.NIF",
     [
         quic_init,
+        config::config_new,
+        config::config_destroy,
         config::config_load_cert_chain_from_pem_file,
         config::config_load_priv_key_from_pem_file,
         config::config_load_verify_locations_from_file,

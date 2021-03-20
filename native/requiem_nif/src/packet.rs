@@ -101,6 +101,9 @@ pub fn packet_build_negotiate_version<'a>(
     let scid = scid.as_slice();
     let dcid = dcid.as_slice();
 
+    let scid = quiche::ConnectionId::from_ref(scid);
+    let dcid = quiche::ConnectionId::from_ref(dcid);
+
     let len = quiche::negotiate_version(&scid, &dcid, &mut *buf).unwrap();
 
     let mut resp = OwnedBinary::new(len).unwrap();
@@ -125,6 +128,10 @@ pub fn packet_build_retry<'a>(
     let odcid = odcid.as_slice();
     let dcid = dcid.as_slice();
     let token = token.as_slice();
+
+    let scid = quiche::ConnectionId::from_ref(scid);
+    let dcid = quiche::ConnectionId::from_ref(dcid);
+    let odcid = quiche::ConnectionId::from_ref(odcid);
 
     let len = quiche::retry(&scid, &odcid, &dcid, &token, version, &mut *buf).unwrap();
 
