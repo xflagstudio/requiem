@@ -47,8 +47,8 @@ impl Connection {
     pub fn new(module: &[u8], conn: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
         Connection {
             module: module.to_vec(),
-            conn: conn,
-            peer: peer,
+            conn,
+            peer,
             buf: [0; 1350],
         }
     }
@@ -149,7 +149,7 @@ impl Connection {
                 }
 
                 Err(_) => {
-                    return Err(atoms::system_error());
+                    Err(atoms::system_error())
                 }
             }
         } else {
@@ -236,53 +236,54 @@ impl Connection {
     }
 }
 
-pub struct LockedConnection {
-    conn: Mutex<Connection>,
-}
-
-impl LockedConnection {
-    pub fn new(module: &[u8], raw: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
-        LockedConnection {
-            conn: Mutex::new(Connection::new(module, raw, peer)),
-        }
-    }
-}
-
 #[rustler::nif]
 pub fn connection_accept(
     module: Binary,
-    cptr: i64,
+    conf_ptr: i64,
     scid: Binary,
     odcid: Binary,
     peer: ResourceArc<Peer>,
-) -> NifResult<(Atom, ResourceArc<LockedConnection>)> {
+) -> NifResult<(Atom, i64)> {
+
     let module = module.as_slice();
     let scid = scid.as_slice();
     let odcid = odcid.as_slice();
 
-    let cptr = cptr as *mut quiche::Config;
-    let c = unsafe { &mut *cptr };
+    let conf_ptr = conf_ptr as *mut quiche::Config;
+    let conf = unsafe { &mut *conf_ptr };
 
     let scid = quiche::ConnectionId::from_ref(scid);
     let odcid = quiche::ConnectionId::from_ref(odcid);
-    match quiche::accept(&scid, Some(&odcid), c) {
-        Ok(conn) => Ok((
-            atoms::ok(),
-            ResourceArc::new(LockedConnection::new(module, conn, peer)),
-        )),
+    match quiche::accept(&scid, Some(&odcid), conf) {
+        Ok(raw_conn) => {
+            let conn = Connection::new(module, raw_conn, peer);
+            Ok((
+                atoms::ok(),
+                Box::into_raw(Box::new(conn)) as i64,
+            ))
+        },
 
         Err(_) => Err(common::error_term(atoms::system_error())),
     }
 }
 
 #[rustler::nif]
+pub fn connection_destroy(conn_ptr: i64) -> NifResult<Atom> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    unsafe { drop(Box::from_raw(conn_ptr)) };
+    Ok(atoms::ok())
+}
+
+
+#[rustler::nif]
 pub fn connection_close(
-    conn: ResourceArc<LockedConnection>,
+    conn_ptr: i64,
     app: bool,
     err: u64,
     reason: Binary,
 ) -> NifResult<Atom> {
-    let mut conn = conn.conn.lock();
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
 
     match conn.close(app, err, reason.as_slice()) {
         Ok(_) => Ok(atoms::ok()),
@@ -291,8 +292,9 @@ pub fn connection_close(
 }
 
 #[rustler::nif]
-pub fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
-    let conn = conn.conn.lock();
+pub fn connection_is_closed(conn_ptr: i64) -> bool {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
     conn.is_closed()
 }
 
@@ -300,12 +302,12 @@ pub fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
 pub fn connection_on_packet(
     env: Env,
     pid: LocalPid,
-    conn: ResourceArc<LockedConnection>,
+    conn_ptr: i64,
     packet: Binary,
 ) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
     let mut packet = packet.to_owned().unwrap();
-
     match conn.on_packet(&env, &pid, &mut packet.as_mut_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
@@ -313,8 +315,9 @@ pub fn connection_on_packet(
 }
 
 #[rustler::nif]
-pub fn connection_on_timeout(conn: ResourceArc<LockedConnection>) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+pub fn connection_on_timeout(conn_ptr: i64) -> NifResult<(Atom, u64)> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
 
     match conn.on_timeout() {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
@@ -324,11 +327,12 @@ pub fn connection_on_timeout(conn: ResourceArc<LockedConnection>) -> NifResult<(
 
 #[rustler::nif]
 pub fn connection_stream_send(
-    conn: ResourceArc<LockedConnection>,
+    conn_ptr: i64,
     stream_id: u64,
     data: Binary,
 ) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
     match conn.stream_send(stream_id, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
@@ -337,17 +341,14 @@ pub fn connection_stream_send(
 
 #[rustler::nif]
 pub fn connection_dgram_send(
-    conn: ResourceArc<LockedConnection>,
+    conn_ptr: i64,
     data: Binary,
 ) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
     match conn.dgram_send(data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
-pub fn on_load(env: Env) -> bool {
-    rustler::resource!(LockedConnection, env);
-    true
-}

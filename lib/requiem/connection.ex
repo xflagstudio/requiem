@@ -606,6 +606,8 @@ defmodule Requiem.Connection do
     Tracer.trace(__MODULE__, state.trace_id, "@terminate #{inspect(reason)}")
 
     state = cancel_conn_timer(state)
+    QUIC.Connection.destroy(state.conn)
+    state = %{state| conn: nil}
 
     ConnectionRegistry.unregister(
       state.handler,

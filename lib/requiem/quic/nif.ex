@@ -97,29 +97,33 @@ defmodule Requiem.QUIC.NIF do
   def config_enable_dgram(_ptr, _enabled, _recv_queue_len, _send_queue_len), do: error()
 
   @spec connection_accept(binary, integer, binary, binary, term) ::
-          {:ok, term} | {:error, :system_error | :not_found}
+          {:ok, integer} | {:error, :system_error | :not_found}
   def connection_accept(_module, _config_ptr, _scid, _odcid, _peer), do: error()
 
-  @spec connection_close(term, boolean, non_neg_integer, binary) ::
+  @spec connection_destroy(integer) ::
+          :ok | {:error, :system_error | :not_found}
+  def connection_destroy(_conn_ptr), do: error()
+
+  @spec connection_close(integer, boolean, non_neg_integer, binary) ::
           :ok | {:error, :system_error | :already_closed}
   def connection_close(_conn, _app, _err, _reason), do: error()
 
-  @spec connection_is_closed(term) :: boolean
+  @spec connection_is_closed(integer) :: boolean
   def connection_is_closed(_conn), do: error()
 
-  @spec connection_on_packet(pid, term, binary) ::
+  @spec connection_on_packet(pid, integer, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_on_packet(_pid, _conn, _packet), do: error()
 
-  @spec connection_on_timeout(term) ::
+  @spec connection_on_timeout(integer) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_on_timeout(_conn), do: error()
 
-  @spec connection_stream_send(term, non_neg_integer, binary) ::
+  @spec connection_stream_send(integer, non_neg_integer, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_stream_send(_conn, _stream_id, _data), do: error()
 
-  @spec connection_dgram_send(term, binary) ::
+  @spec connection_dgram_send(integer, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_dgram_send(_conn, _data), do: error()
 

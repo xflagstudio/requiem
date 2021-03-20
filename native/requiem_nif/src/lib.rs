@@ -1,5 +1,5 @@
 use rustler::types::binary::Binary;
-use rustler::{Atom, Env, NifResult, Term};
+use rustler::{Atom, Env, Term};
 
 mod common;
 mod config;
@@ -8,10 +8,10 @@ mod packet;
 mod socket;
 
 #[rustler::nif]
-fn quic_init(module: Binary, stream_buffer_num: u64, stream_buffer_size: usize) -> NifResult<Atom> {
+fn quic_init(module: Binary, stream_buffer_num: u64, stream_buffer_size: usize) -> Atom {
     let module = module.as_slice();
     connection::buffer_init(&module, stream_buffer_num, stream_buffer_size);
-    Ok(common::atoms::ok())
+    common::atoms::ok()
 }
 
 rustler::init!(
@@ -47,6 +47,7 @@ rustler::init!(
         packet::packet_build_negotiate_version,
         packet::packet_build_retry,
         connection::connection_accept,
+        connection::connection_destroy,
         connection::connection_close,
         connection::connection_is_closed,
         connection::connection_on_packet,
@@ -63,7 +64,6 @@ rustler::init!(
 );
 
 fn load(env: Env, _: Term) -> bool {
-    connection::on_load(env);
     packet::on_load(env);
     socket::on_load(env);
     true

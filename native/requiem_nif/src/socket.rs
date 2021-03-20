@@ -34,7 +34,7 @@ pub struct Peer {
 
 impl Peer {
     pub fn new(addr: SocketAddr) -> Self {
-        Peer { addr: addr }
+        Peer { addr }
     }
 }
 
@@ -60,10 +60,10 @@ impl Socket {
         let events = Events::with_capacity(event_capacity);
 
         Socket {
-            sock: sock,
-            poll: poll,
-            events: events,
-            buf: buf,
+            sock,
+            poll,
+            events,
+            buf,
             target_index: 0,
         }
     }

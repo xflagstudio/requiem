@@ -34,8 +34,7 @@ pub(crate) fn header_token_binary(hdr: &quiche::Header) -> OwnedBinary {
         token.as_mut_slice().copy_from_slice(&t);
         token
     } else {
-        let empty = OwnedBinary::new(0).unwrap();
-        empty
+        OwnedBinary::new(0).unwrap()
     }
 }
 
