@@ -5,92 +5,100 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error}
   def quic_init(_module, _stream_buffer_num, _stream_buffer_size), do: error()
 
-  @spec config_load_cert_chain_from_pem_file(binary, binary) ::
+  @spec config_new() ::
+          integer | {:error, :system_error | :not_found}
+  def config_new(), do: error()
+
+  @spec config_destroy(integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_load_cert_chain_from_pem_file(_module, _file), do: error()
+  def config_destroy(_ptr), do: error()
 
-  @spec config_load_priv_key_from_pem_file(binary, binary) ::
+  @spec config_load_cert_chain_from_pem_file(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def config_load_priv_key_from_pem_file(_module, _file), do: error()
+  def config_load_cert_chain_from_pem_file(_ptr, _file), do: error()
 
-  @spec config_load_verify_locations_from_file(binary, binary) ::
+  @spec config_load_priv_key_from_pem_file(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def config_load_verify_locations_from_file(_module, _file), do: error()
+  def config_load_priv_key_from_pem_file(_ptr, _file), do: error()
 
-  @spec config_load_verify_locations_from_directory(binary, binary) ::
+  @spec config_load_verify_locations_from_file(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def config_load_verify_locations_from_directory(_module, _dir), do: error()
+  def config_load_verify_locations_from_file(_ptr, _file), do: error()
 
-  @spec config_verify_peer(binary, boolean) :: :ok | {:error, :system_error | :not_found}
-  def config_verify_peer(_module, _verify), do: error()
-
-  @spec config_grease(binary, boolean) :: :ok | {:error, :system_error | :not_found}
-  def config_grease(_module, _grease), do: error()
-
-  @spec config_enable_early_data(binary) :: :ok | {:error, :system_error | :not_found}
-  def config_enable_early_data(_module), do: error()
-
-  @spec config_set_application_protos(binary, binary) ::
+  @spec config_load_verify_locations_from_directory(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_application_protos(_module, _protos), do: error()
+  def config_load_verify_locations_from_directory(_ptr, _dir), do: error()
 
-  @spec config_set_max_idle_timeout(binary, non_neg_integer) ::
+  @spec config_verify_peer(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def config_verify_peer(_ptr, _verify), do: error()
+
+  @spec config_grease(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def config_grease(_ptr, _grease), do: error()
+
+  @spec config_enable_early_data(integer) :: :ok | {:error, :system_error | :not_found}
+  def config_enable_early_data(_ptr), do: error()
+
+  @spec config_set_application_protos(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_max_idle_timeout(_module, _v), do: error()
+  def config_set_application_protos(_ptr, _protos), do: error()
 
-  @spec config_set_max_udp_payload_size(binary, non_neg_integer) ::
+  @spec config_set_max_idle_timeout(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_max_udp_payload_size(_module, _v), do: error()
+  def config_set_max_idle_timeout(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_data(binary, non_neg_integer) ::
+  @spec config_set_max_udp_payload_size(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_data(_module, _v), do: error()
+  def config_set_max_udp_payload_size(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_stream_data_bidi_local(binary, non_neg_integer) ::
+  @spec config_set_initial_max_data(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_stream_data_bidi_local(_module, _v), do: error()
+  def config_set_initial_max_data(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_stream_data_bidi_remote(binary, non_neg_integer) ::
+  @spec config_set_initial_max_stream_data_bidi_local(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_stream_data_bidi_remote(_module, _v), do: error()
+  def config_set_initial_max_stream_data_bidi_local(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_stream_data_uni(binary, non_neg_integer) ::
+  @spec config_set_initial_max_stream_data_bidi_remote(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_stream_data_uni(_module, _v), do: error()
+  def config_set_initial_max_stream_data_bidi_remote(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_streams_bidi(binary, non_neg_integer) ::
+  @spec config_set_initial_max_stream_data_uni(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_streams_bidi(_module, _v), do: error()
+  def config_set_initial_max_stream_data_uni(_ptr, _v), do: error()
 
-  @spec config_set_initial_max_streams_uni(binary, non_neg_integer) ::
+  @spec config_set_initial_max_streams_bidi(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_initial_max_streams_uni(_module, _v), do: error()
+  def config_set_initial_max_streams_bidi(_ptr, _v), do: error()
 
-  @spec config_set_ack_delay_exponent(binary, non_neg_integer) ::
+  @spec config_set_initial_max_streams_uni(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_ack_delay_exponent(_module, _v), do: error()
+  def config_set_initial_max_streams_uni(_ptr, _v), do: error()
 
-  @spec config_set_max_ack_delay(binary, non_neg_integer) ::
+  @spec config_set_ack_delay_exponent(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_max_ack_delay(_module, _v), do: error()
+  def config_set_ack_delay_exponent(_ptr, _v), do: error()
 
-  @spec config_set_disable_active_migration(binary, boolean) ::
+  @spec config_set_max_ack_delay(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def config_set_disable_active_migration(_module, _v), do: error()
+  def config_set_max_ack_delay(_ptr, _v), do: error()
 
-  @spec config_set_cc_algorithm_name(binary, binary) :: :ok | {:error, :system_error | :not_found}
-  def config_set_cc_algorithm_name(_module, _name), do: error()
-
-  @spec config_enable_hystart(binary, boolean) :: :ok | {:error, :system_error | :not_found}
-  def config_enable_hystart(_module, _v), do: error()
-
-  @spec config_enable_dgram(binary, boolean, non_neg_integer, non_neg_integer) ::
+  @spec config_set_disable_active_migration(integer, boolean) ::
           :ok | {:error, :system_error | :not_found}
-  def config_enable_dgram(_module, _enabled, _recv_queue_len, _send_queue_len), do: error()
+  def config_set_disable_active_migration(_ptr, _v), do: error()
 
-  @spec connection_accept(binary, binary, binary, term) ::
+  @spec config_set_cc_algorithm_name(integer, binary) :: :ok | {:error, :system_error | :not_found}
+  def config_set_cc_algorithm_name(_ptr, _name), do: error()
+
+  @spec config_enable_hystart(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def config_enable_hystart(_ptr, _v), do: error()
+
+  @spec config_enable_dgram(integer, boolean, non_neg_integer, non_neg_integer) ::
+          :ok | {:error, :system_error | :not_found}
+  def config_enable_dgram(_ptr, _enabled, _recv_queue_len, _send_queue_len), do: error()
+
+  @spec connection_accept(binary, integer, binary, binary, term) ::
           {:ok, term} | {:error, :system_error | :not_found}
-  def connection_accept(_module, _scid, _odcid, _peer), do: error()
+  def connection_accept(_module, _config_ptr, _scid, _odcid, _peer), do: error()
 
   @spec connection_close(term, boolean, non_neg_integer, binary) ::
           :ok | {:error, :system_error | :already_closed}

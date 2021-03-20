@@ -19,6 +19,7 @@ defmodule Requiem.DispatcherWorker do
           conn_id_secret: binary,
           worker_index: non_neg_integer,
           allow_address_routing: boolean,
+          config: integer,
           buffer: term,
           trace_id: binary
         }
@@ -28,6 +29,7 @@ defmodule Requiem.DispatcherWorker do
             token_secret: "",
             conn_id_secret: "",
             worker_index: 0,
+            config: 0,
             allow_address_routing: false,
             buffer: nil,
             trace_id: ""
@@ -55,7 +57,17 @@ defmodule Requiem.DispatcherWorker do
 
   @impl GenServer
   def init(opts) do
+
     state = new(opts)
+
+    config = QUIC.Config.new()
+    try do
+      QUIC.init_config(state.handler, config)
+    rescue
+      err ->
+        QUIC.Config.destroy(config)
+        raise err
+    end
 
     Process.flag(:trap_exit, true)
 
@@ -65,9 +77,10 @@ defmodule Requiem.DispatcherWorker do
          ) do
       {:ok, _pid} ->
         {:ok, buffer} = QUIC.Packet.create_buffer()
-        {:ok, %{state | buffer: buffer}}
+        {:ok, %{state | buffer: buffer, config: config}}
 
       {:error, {:already_registered, _pid}} ->
+        QUIC.Config.destroy(config)
         {:stop, :normal}
     end
   end
@@ -100,6 +113,7 @@ defmodule Requiem.DispatcherWorker do
   @impl GenServer
   def terminate(_reason, state) do
     DispatcherRegistry.unregister(state.handler, state.worker_index)
+    QUIC.Config.destroy(state.config)
     :ok
   end
 
@@ -139,6 +153,7 @@ defmodule Requiem.DispatcherWorker do
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
       allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
+      config: 0,
       trace_id: inspect(self())
     }
   end

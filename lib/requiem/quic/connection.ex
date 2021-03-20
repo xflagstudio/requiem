@@ -1,11 +1,11 @@
 defmodule Requiem.QUIC.Connection do
   alias Requiem.QUIC.NIF
 
-  @spec accept(module, binary, binary, term) :: {:ok, term} | {:error, :system_error | :not_found}
-  def accept(module, scid, odcid, peer) do
+  @spec accept(module, integer, binary, binary, term) :: {:ok, term} | {:error, :system_error | :not_found}
+  def accept(module, config_ptr, scid, odcid, peer) do
     module
     |> to_string()
-    |> NIF.connection_accept(scid, odcid, peer)
+    |> NIF.connection_accept(config_ptr, scid, odcid, peer)
   end
 
   @spec close(term, boolean, non_neg_integer, binary) ::

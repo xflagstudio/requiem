@@ -17,14 +17,7 @@ defmodule Requiem.QUIC do
       ]
       |> Enum.max()
 
-    case init(handler, stream_buffer_pool_size, stream_buffer_size) do
-      :ok ->
-        init_config(handler)
-        :ok
-
-      {:error, :system_error} ->
-        {:error, :system_error}
-    end
+    init(handler, stream_buffer_pool_size, stream_buffer_size)
   end
 
   @spec init(module) :: :ok | {:error, :system_error}
@@ -34,7 +27,8 @@ defmodule Requiem.QUIC do
     |> NIF.quic_init(stream_buffer_pool_size, stream_buffer_size)
   end
 
-  defp init_config(handler) do
+  @spec init_config(module) :: no_return
+  def init_config(handler) do
     is_web_transport = Config.get(handler, :web_transport)
 
     cert_chain = Config.get(handler, :cert_chain)

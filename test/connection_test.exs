@@ -2,6 +2,7 @@ defmodule RequiemTest.ConnectionTest do
   use ExUnit.Case, async: true
 
   alias Requiem.QUIC
+  alias Requiem.QUIC.Config
   alias Requiem.QUIC.Socket
   alias Requiem.QUIC.Connection
 
@@ -12,15 +13,17 @@ defmodule RequiemTest.ConnectionTest do
     odcid = :crypto.strong_rand_bytes(20)
 
     {:ok, peer} = Socket.address_from_string("192.168.0.1:4000")
+    c = Config.new()
 
-    assert Connection.accept(module, scid, odcid, peer) == {:error, :not_found}
-
-    assert QUIC.init(module) == :ok
-
-    {:ok, conn} = Connection.accept(module, scid, odcid, peer)
-    assert Connection.is_closed?(conn) == false
-    assert Connection.close(conn, false, 0x1, "") == :ok
-    assert Connection.is_closed?(conn) == true
+    try do
+      assert QUIC.init(module) == :ok
+      {:ok, conn} = Connection.accept(module, c, scid, odcid, peer)
+      assert Connection.is_closed?(conn) == false
+      assert Connection.close(conn, false, 0x1, "") == :ok
+      assert Connection.is_closed?(conn) == true
+    after
+      Config.destroy(c)
+    end
   end
 
   test "multiple connection state" do
@@ -35,21 +38,27 @@ defmodule RequiemTest.ConnectionTest do
 
     {:ok, peer} = Socket.address_from_string("192.168.0.1:4000")
 
-    {:ok, conn1} = Connection.accept(module, scid1, odcid1, peer)
-    {:ok, conn2} = Connection.accept(module, scid2, odcid2, peer)
-    assert Connection.is_closed?(conn1) == false
-    assert Connection.is_closed?(conn2) == false
-    assert Connection.close(conn1, false, 0x1, "") == :ok
-    assert Connection.is_closed?(conn1) == true
-    assert Connection.is_closed?(conn2) == false
+    c = Config.new()
 
-    assert Connection.close(conn2, false, 0x1, "") == :ok
+    try do
+      {:ok, conn1} = Connection.accept(module, c, scid1, odcid1, peer)
+      {:ok, conn2} = Connection.accept(module, c, scid2, odcid2, peer)
+      assert Connection.is_closed?(conn1) == false
+      assert Connection.is_closed?(conn2) == false
+      assert Connection.close(conn1, false, 0x1, "") == :ok
+      assert Connection.is_closed?(conn1) == true
+      assert Connection.is_closed?(conn2) == false
 
-    assert Connection.is_closed?(conn1) == true
-    assert Connection.is_closed?(conn2) == true
+      assert Connection.close(conn2, false, 0x1, "") == :ok
 
-    # duplicated close command
-    assert Connection.close(conn1, false, 0x1, "") == {:error, :already_closed}
-    assert Connection.close(conn2, false, 0x1, "") == {:error, :already_closed}
+      assert Connection.is_closed?(conn1) == true
+      assert Connection.is_closed?(conn2) == true
+
+      # duplicated close command
+      assert Connection.close(conn1, false, 0x1, "") == {:error, :already_closed}
+      assert Connection.close(conn2, false, 0x1, "") == {:error, :already_closed}
+    after
+      Config.destroy(c)
+    end
   end
 end
