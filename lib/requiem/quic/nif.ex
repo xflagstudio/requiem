@@ -127,22 +127,21 @@ defmodule Requiem.QUIC.NIF do
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_dgram_send(_conn, _data), do: error()
 
-  @spec packet_parse_header(binary) ::
-          {:ok, binary, binary, binary, non_neg_integer, atom, boolean}
-          | {:error, :system_error | :bad_format}
-  def packet_parse_header(_packet), do: error()
+  @spec packet_builder_new() ::
+          {:ok, integer} | {:error, :system_error}
+  def packet_builder_new(), do: error()
 
-  @spec packet_build_buffer_create() ::
-          {:ok, term} | {:error, :system_error}
-  def packet_build_buffer_create(), do: error()
+  @spec packet_builder_destroy(integer) ::
+          :ok | {:error, :system_error}
+  def packet_builder_destroy(_builder), do: error()
 
-  @spec packet_build_negotiate_version(term, binary, binary) ::
+  @spec packet_builder_build_negotiate_version(integer, binary, binary) ::
           {:ok, binary} | {:error, :system_error}
-  def packet_build_negotiate_version(_buffer, _scid, _dcid), do: error()
+  def packet_builder_build_negotiate_version(_builder, _scid, _dcid), do: error()
 
-  @spec packet_build_retry(term, binary, binary, binary, binary, non_neg_integer) ::
+  @spec packet_builder_build_retry(integer, binary, binary, binary, binary, non_neg_integer) ::
           {:ok, binary} | {:error, :system_error}
-  def packet_build_retry(_buffer, _scid, _dcid, _new_scid, _token, _version), do: error()
+  def packet_builder_build_retry(_builder, _scid, _dcid, _new_scid, _token, _version), do: error()
 
   @spec socket_open(binary, binary, pid, [pid], non_neg_integer, non_neg_integer) ::
           :ok | {:error, :system_error | :cant_bind}

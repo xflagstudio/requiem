@@ -42,10 +42,10 @@ rustler::init!(
         config::config_set_cc_algorithm_name,
         config::config_enable_hystart,
         config::config_enable_dgram,
-        packet::packet_build_buffer_create,
-        packet::packet_parse_header,
-        packet::packet_build_negotiate_version,
-        packet::packet_build_retry,
+        packet::packet_builder_new,
+        packet::packet_builder_destroy,
+        packet::packet_builder_build_negotiate_version,
+        packet::packet_builder_build_retry,
         connection::connection_accept,
         connection::connection_destroy,
         connection::connection_close,
@@ -64,7 +64,6 @@ rustler::init!(
 );
 
 fn load(env: Env, _: Term) -> bool {
-    packet::on_load(env);
     socket::on_load(env);
     true
 }

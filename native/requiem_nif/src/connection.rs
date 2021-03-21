@@ -148,9 +148,7 @@ impl Connection {
                     Ok(self.next_timeout())
                 }
 
-                Err(_) => {
-                    Err(atoms::system_error())
-                }
+                Err(_) => Err(atoms::system_error()),
             }
         } else {
             Err(atoms::already_closed())
@@ -244,7 +242,6 @@ pub fn connection_accept(
     odcid: Binary,
     peer: ResourceArc<Peer>,
 ) -> NifResult<(Atom, i64)> {
-
     let module = module.as_slice();
     let scid = scid.as_slice();
     let odcid = odcid.as_slice();
@@ -257,11 +254,8 @@ pub fn connection_accept(
     match quiche::accept(&scid, Some(&odcid), conf) {
         Ok(raw_conn) => {
             let conn = Connection::new(module, raw_conn, peer);
-            Ok((
-                atoms::ok(),
-                Box::into_raw(Box::new(conn)) as i64,
-            ))
-        },
+            Ok((atoms::ok(), Box::into_raw(Box::new(conn)) as i64))
+        }
 
         Err(_) => Err(common::error_term(atoms::system_error())),
     }
@@ -274,14 +268,8 @@ pub fn connection_destroy(conn_ptr: i64) -> NifResult<Atom> {
     Ok(atoms::ok())
 }
 
-
 #[rustler::nif]
-pub fn connection_close(
-    conn_ptr: i64,
-    app: bool,
-    err: u64,
-    reason: Binary,
-) -> NifResult<Atom> {
+pub fn connection_close(conn_ptr: i64, app: bool, err: u64, reason: Binary) -> NifResult<Atom> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
 
@@ -340,10 +328,7 @@ pub fn connection_stream_send(
 }
 
 #[rustler::nif]
-pub fn connection_dgram_send(
-    conn_ptr: i64,
-    data: Binary,
-) -> NifResult<(Atom, u64)> {
+pub fn connection_dgram_send(conn_ptr: i64, data: Binary) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
     match conn.dgram_send(data.as_slice()) {
@@ -351,4 +336,3 @@ pub fn connection_dgram_send(
         Err(reason) => Err(common::error_term(reason)),
     }
 }
-

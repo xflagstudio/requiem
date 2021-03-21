@@ -20,7 +20,7 @@ defmodule Requiem.DispatcherWorker do
           worker_index: non_neg_integer,
           allow_address_routing: boolean,
           config: integer,
-          buffer: term,
+          packet_builder: integer,
           trace_id: binary
         }
 
@@ -31,7 +31,7 @@ defmodule Requiem.DispatcherWorker do
             worker_index: 0,
             config: 0,
             allow_address_routing: false,
-            buffer: nil,
+            packet_builder: 0,
             trace_id: ""
 
   @spec child_spec(Keyword.t()) :: map
@@ -76,8 +76,8 @@ defmodule Requiem.DispatcherWorker do
            state.worker_index
          ) do
       {:ok, _pid} ->
-        {:ok, buffer} = QUIC.Packet.create_buffer()
-        {:ok, %{state | buffer: buffer, config: config}}
+        {:ok, builder} = QUIC.PacketBuilder.new()
+        {:ok, %{state | packet_builder: builder, config: config}}
 
       {:error, {:already_registered, _pid}} ->
         QUIC.Config.destroy(config)
@@ -114,6 +114,7 @@ defmodule Requiem.DispatcherWorker do
   def terminate(_reason, state) do
     DispatcherRegistry.unregister(state.handler, state.worker_index)
     QUIC.Config.destroy(state.config)
+    QUIC.PacketBuilder.destroy(state.packet_builder)
     :ok
   end
 
@@ -185,7 +186,7 @@ defmodule Requiem.DispatcherWorker do
   end
 
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
-    case QUIC.Packet.build_negotiate_version(state.buffer, scid, dcid) do
+    case QUIC.PacketBuilder.build_negotiate_version(state.packet_builder, scid, dcid) do
       {:ok, resp} ->
         send(address, resp, state)
         :ok
@@ -201,7 +202,7 @@ defmodule Requiem.DispatcherWorker do
          {:ok, token} <-
            RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
-           QUIC.Packet.build_retry(state.buffer, scid, dcid, new_id, token, version) do
+           QUIC.PacketBuilder.build_retry(state.packet_builder, scid, dcid, new_id, token, version) do
       Tracer.trace(__MODULE__, state.trace_id, "@send")
       send(address, resp, state)
       :ok
