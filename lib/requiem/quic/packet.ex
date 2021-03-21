@@ -11,7 +11,8 @@ defmodule Requiem.QUIC.PacketBuilder do
     NIF.packet_builder_destroy(builder)
   end
 
-  @spec build_negotiate_version(integer, binary, binary) :: {:ok, binary} | {:error, :system_error}
+  @spec build_negotiate_version(integer, binary, binary) ::
+          {:ok, binary} | {:error, :system_error}
   def build_negotiate_version(builder, scid, dcid) do
     NIF.packet_builder_build_negotiate_version(builder, scid, dcid)
   end

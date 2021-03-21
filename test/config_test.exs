@@ -11,6 +11,7 @@ defmodule RequiemTest.ConfigTest do
     assert QUIC.init(module) == :ok
 
     c = Config.new()
+
     try do
       assert Config.load_cert_chain_from_pem_file(c, "") == {:error, :system_error}
       assert Config.load_cert_chain_from_pem_file(c, "test/support/cert.crt") == :ok
@@ -43,7 +44,7 @@ defmodule RequiemTest.ConfigTest do
       assert Config.enable_dgram(c, true, 100, 100) == :ok
       assert Config.enable_dgram(c, false, 100, 100) == :ok
     after
-        Config.destroy(c)
+      Config.destroy(c)
     end
   end
 

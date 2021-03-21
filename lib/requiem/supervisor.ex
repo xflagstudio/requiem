@@ -10,6 +10,8 @@ defmodule Requiem.Supervisor do
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherSupervisor
   alias Requiem.DispatcherRegistry
+  alias Requiem.SenderSupervisor
+  alias Requiem.SenderRegistry
   alias Requiem.Transport
 
   @spec child_spec(module, atom) :: Supervisor.child_spec()
@@ -44,6 +46,7 @@ defmodule Requiem.Supervisor do
     [
       {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},
       {Registry, keys: :unique, name: DispatcherRegistry.name(handler)},
+      {Registry, keys: :unique, name: SenderRegistry.name(handler)},
       {ConnectionSupervisor, handler},
       {DispatcherSupervisor,
        [
@@ -53,6 +56,11 @@ defmodule Requiem.Supervisor do
          conn_id_secret: handler |> Config.get!(:connection_id_secret),
          number_of_dispatchers: handler |> Config.get!(:dispatcher_pool_size),
          allow_address_routing: handler |> Config.get!(:allow_address_routing)
+       ]},
+      {SenderSupervisor,
+       [
+         handler: handler,
+         number_of_senders: handler |> Config.get!(:socket_pool_size)
        ]},
       {Transport,
        [

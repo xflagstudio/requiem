@@ -4,29 +4,6 @@ defmodule Requiem.QUIC do
 
   @web_transport_alpn "wq-vvv-01"
 
-  @spec setup(module) ::
-          :ok | {:error, :system_error}
-  def setup(handler) do
-    stream_buffer_pool_size = Config.get(handler, :stream_buffer_pool_size)
-
-    stream_buffer_size =
-      [
-        Config.get(handler, :initial_max_stream_data_bidi_local),
-        Config.get(handler, :initial_max_stream_data_uni),
-        100_000
-      ]
-      |> Enum.max()
-
-    init(handler, stream_buffer_pool_size, stream_buffer_size)
-  end
-
-  @spec init(module) :: :ok | {:error, :system_error}
-  def init(handler, stream_buffer_pool_size \\ 10, stream_buffer_size \\ 8092) do
-    handler
-    |> to_string()
-    |> NIF.quic_init(stream_buffer_pool_size, stream_buffer_size)
-  end
-
   @spec init_config(module, integer) :: no_return
   def init_config(handler, ptr) do
     is_web_transport = Config.get(handler, :web_transport)

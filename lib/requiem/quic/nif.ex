@@ -1,10 +1,6 @@
 defmodule Requiem.QUIC.NIF do
   use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
-  @spec quic_init(binary, non_neg_integer, non_neg_integer) ::
-          :ok | {:error, :system_error}
-  def quic_init(_module, _stream_buffer_num, _stream_buffer_size), do: error()
-
   @spec config_new() ::
           integer | {:error, :system_error | :not_found}
   def config_new(), do: error()
@@ -86,7 +82,8 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error | :not_found}
   def config_set_disable_active_migration(_ptr, _v), do: error()
 
-  @spec config_set_cc_algorithm_name(integer, binary) :: :ok | {:error, :system_error | :not_found}
+  @spec config_set_cc_algorithm_name(integer, binary) ::
+          :ok | {:error, :system_error | :not_found}
   def config_set_cc_algorithm_name(_ptr, _name), do: error()
 
   @spec config_enable_hystart(integer, boolean) :: :ok | {:error, :system_error | :not_found}
@@ -143,14 +140,26 @@ defmodule Requiem.QUIC.NIF do
           {:ok, binary} | {:error, :system_error}
   def packet_builder_build_retry(_builder, _scid, _dcid, _new_scid, _token, _version), do: error()
 
-  @spec socket_open(binary, binary, pid, [pid], non_neg_integer, non_neg_integer) ::
-          :ok | {:error, :system_error | :cant_bind}
-  def socket_open(_module, _address, _pid, _target_pids, _event_capacity, _poll_interval),
-    do: error()
+  @spec cpu_num() ::
+          integer | {:error, :system_error | :not_found}
+  def cpu_num(), do: error()
 
-  @spec socket_send(binary, term, binary) ::
+  @spec socket_sender_get(integer, non_neg_integer) ::
+          {:ok, integer} | {:error, :system_error | :not_found}
+  def socket_sender_get(_socket_ptr, _idx), do: error()
+
+  @spec socket_sender_send(integer, term, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def socket_send(_module, _addr, _packet), do: error()
+  def socket_sender_send(_socket_ptr, _addr, _packet), do: error()
+
+  @spec socket_sender_destroy(integer) ::
+          :ok | {:error, :system_error | :not_found}
+  def socket_sender_destroy(_socket_ptr), do: error()
+
+  @spec socket_open(integer, binary, pid, [pid]) ::
+          :ok | {:error, :system_error | :cant_bind}
+  def socket_open(_num_node, _address, _pid, _target_pids),
+    do: error()
 
   @spec socket_close(binary) ::
           :ok | {:error, :system_error | :not_found}
@@ -159,10 +168,6 @@ defmodule Requiem.QUIC.NIF do
   @spec socket_address_parts(term) ::
           {:ok, binary, non_neg_integer}
   def socket_address_parts(_address), do: error()
-
-  @spec socket_address_from_string(binary) ::
-          {:ok, term} | {:error, :bad_format}
-  def socket_address_from_string(_address), do: error()
 
   defp error(), do: :erlang.nif_error(:nif_not_loaded)
 end

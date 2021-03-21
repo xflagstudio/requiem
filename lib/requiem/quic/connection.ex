@@ -1,7 +1,8 @@
 defmodule Requiem.QUIC.Connection do
   alias Requiem.QUIC.NIF
 
-  @spec accept(module, integer, binary, binary, term) :: {:ok, term} | {:error, :system_error | :not_found}
+  @spec accept(module, integer, binary, binary, term) ::
+          {:ok, term} | {:error, :system_error | :not_found}
   def accept(module, config_ptr, scid, odcid, peer) do
     module
     |> to_string()

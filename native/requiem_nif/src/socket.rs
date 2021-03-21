@@ -1,32 +1,25 @@
+use std::net::{IpAddr, SocketAddr, UdpSocket};
+//use std::os::unix::io::AsRawFd;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::str;
+use std::sync::{Arc, Barrier};
+use std::thread::{self, JoinHandle};
+
 use rustler::env::OwnedEnv;
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, ListIterator, NifResult, ResourceArc};
 
-use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RwLock};
-
-use mio::net::UdpSocket;
-use mio::{Events, Interest, Poll, Token};
-
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::net::{IpAddr, SocketAddr};
-use std::str;
-use std::sync::Arc;
-use std::thread;
-use std::time;
+use crossbeam_channel::{bounded, select, unbounded, Sender};
+use nix::sched::CpuSet;
+//use nix::sched::{sched_setaffinity, CpuSet};
+//use nix::unistd::gettid;
+use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::common::{self, atoms};
-use crate::packet::{self};
-
-type ModuleName = Vec<u8>;
-type SocketCloser = RwLock<HashMap<ModuleName, Arc<RwLock<bool>>>>;
-type SenderSocket = RwLock<HashMap<ModuleName, Mutex<std::net::UdpSocket>>>;
-
-static CLOSERS: Lazy<SocketCloser> = Lazy::new(|| RwLock::new(HashMap::new()));
-static SOCKETS: Lazy<SenderSocket> = Lazy::new(|| RwLock::new(HashMap::new()));
+use crate::packet;
 
 pub struct Peer {
     addr: SocketAddr,
@@ -38,221 +31,369 @@ impl Peer {
     }
 }
 
-pub struct Socket {
-    sock: UdpSocket,
-    poll: Poll,
-    events: Events,
-    buf: [u8; 65535],
-    target_index: usize,
+#[derive(Eq, PartialEq)]
+enum ClusterState {
+    Idle,
+    Started,
+    Closed,
 }
 
-impl Socket {
-    pub fn new(sock: std::net::UdpSocket, event_capacity: usize) -> Self {
-        let buf = [0; 65535];
-        let mut sock = UdpSocket::from_std(sock);
+pub struct SocketCluster {
+    num_node: usize,
+    r_handles: Vec<Option<JoinHandle<()>>>,
+    r_closers: Vec<Sender<()>>,
+    s_handles: Vec<Option<JoinHandle<()>>>,
+    s_closers: Vec<Sender<()>>,
+    s_senders: Vec<Sender<(SocketAddr, Vec<u8>)>>,
+    barrier: Arc<Barrier>,
+    state: ClusterState,
+}
 
-        let poll = Poll::new().unwrap();
+impl SocketCluster {
+    fn build_socket(addr: &str) -> Result<UdpSocket, Atom> {
+        let addr = addr
+            .parse::<SocketAddr>()
+            .map_err(|_| atoms::bad_format())?;
 
-        poll.registry()
-            .register(&mut sock, Token(0), Interest::READABLE)
-            .unwrap();
+        let domain = if addr.is_ipv4() {
+            Domain::ipv4()
+        } else {
+            Domain::ipv6()
+        };
 
-        let events = Events::with_capacity(event_capacity);
+        let sock = Socket::new(domain, Type::dgram(), Some(Protocol::udp()))
+            .map_err(|_| atoms::socket_error())?;
 
-        Socket {
-            sock,
-            poll,
-            events,
-            buf,
-            target_index: 0,
+        sock.set_reuse_address(true)
+            .map_err(|_| atoms::socket_error())?;
+
+        sock.set_reuse_port(true)
+            .map_err(|_| atoms::socket_error())?;
+
+        sock.set_nonblocking(true)
+            .map_err(|_| atoms::socket_error())?;
+
+        sock.bind(&addr.into()).map_err(|_| atoms::socket_error())?;
+
+        let std_sock = sock.into_udp_socket();
+
+        Ok(std_sock)
+    }
+
+    pub fn new(num_node: usize) -> Self {
+        Self {
+            num_node,
+            r_handles: Vec::with_capacity(num_node),
+            r_closers: Vec::with_capacity(num_node),
+            s_handles: Vec::with_capacity(num_node),
+            s_closers: Vec::with_capacity(num_node),
+            s_senders: Vec::with_capacity(num_node),
+            barrier: Arc::new(Barrier::new(num_node * 2)),
+            state: ClusterState::Idle,
         }
     }
 
-    pub fn poll(&mut self, env: &Env, pid: &LocalPid, target_pids: &[LocalPid], interval: u64) {
-        let timeout = time::Duration::from_millis(interval);
-        self.poll.poll(&mut self.events, Some(timeout)).unwrap();
+    pub fn is_started(&self) -> bool {
+        self.state == ClusterState::Started
+    }
 
-        loop {
-            let (len, peer) = match self.sock.recv_from(&mut self.buf) {
-                Ok(v) => v,
-                Err(e) => {
-                    if e.kind() != std::io::ErrorKind::WouldBlock {
-                        env.send(
-                            pid,
-                            make_tuple(
-                                *env,
-                                &[
-                                    atoms::socket_error().to_term(*env),
-                                    atoms::cant_receive().to_term(*env),
-                                ],
-                            ),
-                        );
-                    }
-                    return;
-                }
-            };
+    pub fn start(
+        &mut self,
+        addr: &str,
+        caller_pid: &LocalPid,
+        target_pids: &[LocalPid],
+    ) -> Result<(), Atom> {
+        if self.state != ClusterState::Idle {
+            return Err(atoms::bad_state());
+        }
 
-            if len < 4 {
-                // too short packet. ignore
-                continue;
+        let num_node = self.num_node;
+
+        let mut sockets: Vec<Option<UdpSocket>> = Vec::with_capacity(num_node);
+
+        for _n in 0..num_node {
+            let sock = Self::build_socket(&addr)?;
+            sockets.push(Some(sock));
+        }
+
+        let step = target_pids.len() / self.num_node;
+
+        for (n, sock) in sockets.iter_mut().enumerate() {
+            let r_sock = sock.take().unwrap();
+            let s_sock = r_sock.try_clone().unwrap();
+            self.start_receiver_thread(n, r_sock, caller_pid, target_pids, step);
+            self.start_sender_thread(n, s_sock);
+        }
+
+        Ok(())
+    }
+
+    pub fn sender(&self, idx: usize) -> Sender<(SocketAddr, Vec<u8>)> {
+        self.s_senders[idx].clone()
+    }
+
+    pub fn stop(&mut self) {
+        if !self.is_started() {
+            return;
+        }
+        self.state = ClusterState::Closed;
+        for r_closer in self.r_closers.iter() {
+            let _ = r_closer.send(());
+        }
+        for s_closer in self.s_closers.iter() {
+            let _ = s_closer.send(());
+        }
+        for r_handle in self.r_handles.iter_mut() {
+            if let Some(handle) = r_handle.take() {
+                let _ = handle.join();
             }
-
-            match quiche::Header::from_slice(&mut self.buf[..len], quiche::MAX_CONN_ID_LEN) {
-                Ok(hdr) => {
-                    let scid = packet::header_scid_binary(&hdr);
-                    let dcid = packet::header_dcid_binary(&hdr);
-                    let token = packet::header_token_binary(&hdr);
-
-                    let version = hdr.version;
-
-                    let typ = packet::packet_type(hdr.ty);
-                    let is_version_supported = quiche::version_is_supported(hdr.version);
-
-                    let mut body = OwnedBinary::new(len).unwrap();
-                    body.as_mut_slice().copy_from_slice(&self.buf[..len]);
-
-                    env.send(
-                        &target_pids[self.target_index],
-                        make_tuple(
-                            *env,
-                            &[
-                                atoms::__packet__().to_term(*env),
-                                ResourceArc::new(Peer::new(peer)).encode(*env),
-                                body.release(*env).to_term(*env),
-                                scid.release(*env).to_term(*env),
-                                dcid.release(*env).to_term(*env),
-                                token.release(*env).to_term(*env),
-                                version.encode(*env),
-                                typ.to_term(*env),
-                                is_version_supported.encode(*env),
-                            ],
-                        ),
-                    );
-
-                    if self.target_index >= target_pids.len() - 1 {
-                        self.target_index = 0;
-                    } else {
-                        self.target_index += 1;
-                    }
-                }
-                Err(_) => {
-                    // ignore
-                    continue;
-                }
-            };
+        }
+        for s_handle in self.s_handles.iter_mut() {
+            if let Some(handle) = s_handle.take() {
+                let _ = handle.join();
+            }
         }
     }
+
+    fn start_receiver_thread(
+        &mut self,
+        nth: usize,
+        sock: UdpSocket,
+        caller_pid: &LocalPid,
+        target_pids: &[LocalPid],
+        step: usize,
+    ) {
+        let (closer_tx, closer_rx) = bounded::<()>(1);
+        self.r_closers.push(closer_tx);
+
+        let barrier = self.barrier.clone();
+
+        let oenv = OwnedEnv::new();
+
+        let pid = caller_pid.clone();
+
+        let target_pid_start = nth * step;
+        let target_pid_end = (nth + 1) * step;
+
+        let target_pids = target_pids[target_pid_start..target_pid_end].to_vec();
+
+        let handle = thread::spawn(move || {
+            oenv.run(move |env| {
+
+                let mut buf = [0u8; 65535];
+
+                barrier.wait();
+
+                loop {
+                    select! {
+                        recv(closer_rx) -> _ => {
+                            break;
+                        },
+                        default => {
+                            match sock.recv_from(&mut buf) {
+                                Ok((len, peer)) => {
+
+                                    if len < 4 {
+                                        continue;
+                                    }
+
+                                    if len > 1500 {
+                                        continue;
+                                    }
+
+                                    match quiche::Header::from_slice(&mut buf[..len], quiche::MAX_CONN_ID_LEN) {
+
+                                        Ok(hdr) => {
+                                            let scid = packet::header_scid_binary(&hdr);
+                                            let dcid = packet::header_dcid_binary(&hdr);
+                                            let token = packet::header_token_binary(&hdr);
+
+                                            let version = hdr.version;
+
+                                            let typ = packet::packet_type(hdr.ty);
+                                            let is_version_supported = quiche::version_is_supported(hdr.version);
+
+                                            let mut body = OwnedBinary::new(len).unwrap();
+                                            body.as_mut_slice().copy_from_slice(&buf[..len]);
+
+                                            // TODO
+                                            // 下記のtarget_indexは、peerのアドレスの値のhashから算出するようにする
+                                            let mut hasher = DefaultHasher::new();
+                                            peer.hash(&mut hasher);
+                                            let idx = hasher.finish() % (target_pids.len() as u64);
+
+                                            env.send(
+                                                &target_pids[idx as usize],
+                                                make_tuple(
+                                                    env,
+                                                    &[
+                                                        atoms::__packet__().to_term(env),
+                                                        ResourceArc::new(Peer::new(peer)).encode(env),
+                                                        body.release(env).to_term(env),
+                                                        scid.release(env).to_term(env),
+                                                        dcid.release(env).to_term(env),
+                                                        token.release(env).to_term(env),
+                                                        version.encode(env),
+                                                        typ.to_term(env),
+                                                        is_version_supported.encode(env),
+                                                    ],
+                                                ),
+                                            );
+                                        },
+                                        Err(_) => {
+                                            // this is not a QUIC packet, ignore.
+                                            continue;
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    match e.kind() {
+                                        std::io::ErrorKind::WouldBlock => {
+                                            continue;
+                                        },
+                                        _ => {
+                                            env.send(&pid, make_tuple(env, &[
+                                                atoms::socket_error().to_term(env),
+                                                atoms::cant_receive().to_term(env),
+                                            ]));
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+
+            });
+        });
+
+        self.r_handles.push(Some(handle));
+    }
+
+    fn start_sender_thread(&mut self, _nth: usize, sock: UdpSocket) {
+        let (closer_tx, closer_rx) = bounded::<()>(1);
+        let (sender_tx, sender_rx) = unbounded::<(SocketAddr, Vec<u8>)>();
+
+        self.s_senders.push(sender_tx);
+        self.s_closers.push(closer_tx);
+
+        let barrier = self.barrier.clone();
+
+        let handle = thread::spawn(move || {
+
+            barrier.wait();
+
+            loop {
+                select! {
+                    recv(closer_rx) -> _ => {
+                        break;
+                    },
+                    recv(sender_rx) -> msg => {
+                        if let Ok((peer, packet)) = msg {
+                            'send: loop {
+                                match sock.send_to(&packet, peer) {
+                                    Ok(_) => {
+                                        break 'send;
+                                    },
+                                    Err(e) => {
+                                        match e.kind() {
+                                            std::io::ErrorKind::WouldBlock => {
+                                                continue 'send;
+                                            },
+                                            _ => {
+                                                //error!("sender IO error: {:?}", e);
+                                                break 'send;
+                                            }
+
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        self.s_handles.push(Some(handle));
+    }
 }
-pub(crate) fn send_internal(
-    module: &[u8],
-    peer: &ResourceArc<Peer>,
-    packet: &[u8],
-) -> Result<(), Atom> {
-    let socket_table = SOCKETS.read();
-    if let Some(socket) = socket_table.get(module) {
-        let socket = socket.lock();
-        match socket.send_to(packet, &peer.addr) {
-            Ok(_size) => Ok(()),
-            Err(_) => Err(atoms::system_error()),
-        }
-    } else {
-        Err(atoms::not_found())
+
+impl Drop for SocketCluster {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 
 #[rustler::nif]
-pub fn socket_address_from_string(address: Binary) -> NifResult<(Atom, ResourceArc<Peer>)> {
-    let addr = match str::from_utf8(address.as_slice()) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(common::error_term(atoms::bad_format()));
-        }
-    };
-    let addr: SocketAddr = addr.parse().unwrap();
-    Ok((atoms::ok(), ResourceArc::new(Peer::new(addr))))
+pub fn cpu_num() -> i32 {
+    CpuSet::count() as i32
+}
+
+#[rustler::nif]
+pub fn socket_sender_get(socket_ptr: i64, idx: i32) -> NifResult<(Atom, i64)> {
+    let socket_ptr = socket_ptr as *mut SocketCluster;
+    let socket = unsafe { &mut *socket_ptr };
+    let sender = socket.sender(idx as usize);
+    let sender_ptr = Box::into_raw(Box::new(sender));
+    Ok((atoms::ok(), sender_ptr as i64))
+}
+
+#[rustler::nif]
+pub fn socket_sender_send(
+    sender_ptr: i64,
+    peer: ResourceArc<Peer>,
+    data: Binary,
+) -> NifResult<Atom> {
+    let sender_ptr = sender_ptr as *mut Sender<(SocketAddr, Vec<u8>)>;
+    let sender = unsafe { &mut *sender_ptr };
+    let _ = sender.send((peer.addr, data.as_slice().to_vec()));
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+pub fn socket_sender_destroy(sender_ptr: i64) -> NifResult<Atom> {
+    let sender_ptr = sender_ptr as *mut Sender<(SocketAddr, Vec<u8>)>;
+    unsafe { drop(Box::from_raw(sender_ptr)) };
+    Ok(atoms::ok())
 }
 
 #[rustler::nif]
 pub fn socket_open(
-    module: Binary,
     address: Binary,
+    num_node: i32,
     pid: LocalPid,
     target_pids: ListIterator,
-    event_capacity: u64,
-    poll_interval: u64,
-) -> NifResult<Atom> {
-    let module = module.as_slice();
+) -> NifResult<(Atom, i64)> {
 
     let targets: Vec<LocalPid> = match target_pids.map(|x| x.decode::<LocalPid>()).collect() {
         Ok(v) => v,
         Err(_) => return Err(common::error_term(atoms::system_error())),
     };
 
+    let num_node = num_node as usize;
+    if targets.len() < num_node || targets.len() % num_node != 0 {
+        return Err(common::error_term(atoms::system_error()));
+    }
+
     let address = str::from_utf8(address.as_slice()).unwrap();
 
-    let std_sock = match std::net::UdpSocket::bind(address) {
-        Ok(v) => v,
-        Err(_) => return Err(common::error_term(atoms::cant_bind())),
-    };
+    let mut socket = SocketCluster::new(num_node);
 
-    let std_sock2 = std_sock.try_clone().unwrap();
-
-    let closer = Arc::new(RwLock::new(false));
-    let closer2 = closer.clone();
-
-    let cap = event_capacity.try_into().unwrap();
-    let mut receiver = Socket::new(std_sock2, cap);
-
-    let oenv = OwnedEnv::new();
-    thread::spawn(move || {
-        oenv.run(move |env| loop {
-            let should_close = closer2.read();
-            if *should_close {
-                break;
-            }
-            receiver.poll(&env, &pid, &targets, poll_interval);
-        })
-    });
-
-    let mut socket_table = SOCKETS.write();
-    if !socket_table.contains_key(module) {
-        socket_table.insert(module.to_vec(), Mutex::new(std_sock));
-    }
-
-    let mut closer_table = CLOSERS.write();
-    if !closer_table.contains_key(module) {
-        closer_table.insert(module.to_vec(), closer);
-    }
-
-    Ok(atoms::ok())
-}
-
-#[rustler::nif]
-pub fn socket_send(module: Binary, peer: ResourceArc<Peer>, packet: Binary) -> NifResult<Atom> {
-    match send_internal(module.as_slice(), &peer, packet.as_slice()) {
-        Ok(()) => Ok(atoms::ok()),
+    match socket.start(address, &pid, &targets) {
+        Ok(()) => {
+            let socket_ptr = Box::into_raw(Box::new(socket));
+            Ok((atoms::ok(), socket_ptr as i64))
+        }
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
 #[rustler::nif]
-pub fn socket_close(module: Binary) -> NifResult<Atom> {
-    let module = module.as_slice();
-
-    let mut socket_table = SOCKETS.write();
-    if socket_table.contains_key(module) {
-        socket_table.remove(module);
-    }
-
-    let mut closer_table = CLOSERS.write();
-    if closer_table.contains_key(module) {
-        if let Some(closer) = closer_table.get(module) {
-            let mut should_close = closer.write();
-            *should_close = true;
-        }
-
-        closer_table.remove(module);
-    }
+pub fn socket_close(socket_ptr: i64) -> NifResult<Atom> {
+    let socket_ptr = socket_ptr as *mut SocketCluster;
+    unsafe { drop(Box::from_raw(socket_ptr)) };
     Ok(atoms::ok())
 }
 

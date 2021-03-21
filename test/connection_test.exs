@@ -18,6 +18,7 @@ defmodule RequiemTest.ConnectionTest do
     try do
       assert QUIC.init(module) == :ok
       {:ok, conn} = Connection.accept(module, c, scid, odcid, peer)
+
       try do
         assert Connection.is_closed?(conn) == false
         assert Connection.close(conn, false, 0x1, "") == :ok
@@ -47,6 +48,7 @@ defmodule RequiemTest.ConnectionTest do
     try do
       {:ok, conn1} = Connection.accept(module, c, scid1, odcid1, peer)
       {:ok, conn2} = Connection.accept(module, c, scid2, odcid2, peer)
+
       try do
         assert Connection.is_closed?(conn1) == false
         assert Connection.is_closed?(conn2) == false

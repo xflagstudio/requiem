@@ -41,11 +41,8 @@ pub struct PacketBuilder {
 }
 
 impl PacketBuilder {
-
     pub fn new() -> Self {
-        PacketBuilder {
-            buf: [0; 1500],
-        }
+        PacketBuilder { buf: [0; 1500] }
     }
 
     pub fn build_negotiate_version(&mut self, scid: &[u8], dcid: &[u8]) -> OwnedBinary {
@@ -58,7 +55,14 @@ impl PacketBuilder {
         resp
     }
 
-    pub fn build_retry(&mut self, scid: &[u8], dcid: &[u8], odcid: &[u8], token: &[u8], version: u32) -> OwnedBinary {
+    pub fn build_retry(
+        &mut self,
+        scid: &[u8],
+        dcid: &[u8],
+        odcid: &[u8],
+        token: &[u8],
+        version: u32,
+    ) -> OwnedBinary {
         let scid = quiche::ConnectionId::from_ref(scid);
         let dcid = quiche::ConnectionId::from_ref(dcid);
         let odcid = quiche::ConnectionId::from_ref(odcid);
@@ -67,7 +71,6 @@ impl PacketBuilder {
         resp.as_mut_slice().copy_from_slice(&self.buf[..len]);
         resp
     }
-
 }
 
 #[rustler::nif]
@@ -90,14 +93,10 @@ pub fn packet_builder_build_negotiate_version<'a>(
     scid: Binary,
     dcid: Binary,
 ) -> NifResult<(Atom, Binary<'a>)> {
-
     let builder_ptr = builder_ptr as *mut PacketBuilder;
-    let builder = unsafe{ &mut *builder_ptr };
+    let builder = unsafe { &mut *builder_ptr };
 
-    let resp = builder.build_negotiate_version(
-        scid.as_slice(),
-        dcid.as_slice(),
-    );
+    let resp = builder.build_negotiate_version(scid.as_slice(), dcid.as_slice());
 
     Ok((atoms::ok(), resp.release(env)))
 }
@@ -112,9 +111,8 @@ pub fn packet_builder_build_retry<'a>(
     token: Binary,
     version: u32,
 ) -> NifResult<(Atom, Binary<'a>)> {
-
     let builder_ptr = builder_ptr as *mut PacketBuilder;
-    let builder = unsafe{ &mut *builder_ptr };
+    let builder = unsafe { &mut *builder_ptr };
 
     let resp = builder.build_retry(
         scid.as_slice(),
@@ -126,4 +124,3 @@ pub fn packet_builder_build_retry<'a>(
 
     Ok((atoms::ok(), resp.release(env)))
 }
-

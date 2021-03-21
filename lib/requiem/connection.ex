@@ -607,7 +607,7 @@ defmodule Requiem.Connection do
 
     state = cancel_conn_timer(state)
     QUIC.Connection.destroy(state.conn)
-    state = %{state| conn: nil}
+    state = %{state | conn: nil}
 
     ConnectionRegistry.unregister(
       state.handler,

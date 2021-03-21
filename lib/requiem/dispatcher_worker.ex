@@ -57,10 +57,10 @@ defmodule Requiem.DispatcherWorker do
 
   @impl GenServer
   def init(opts) do
-
     state = new(opts)
 
     config = QUIC.Config.new()
+
     try do
       QUIC.init_config(state.handler, config)
     rescue
@@ -202,7 +202,14 @@ defmodule Requiem.DispatcherWorker do
          {:ok, token} <-
            RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
-           QUIC.PacketBuilder.build_retry(state.packet_builder, scid, dcid, new_id, token, version) do
+           QUIC.PacketBuilder.build_retry(
+             state.packet_builder,
+             scid,
+             dcid,
+             new_id,
+             token,
+             version
+           ) do
       Tracer.trace(__MODULE__, state.trace_id, "@send")
       send(address, resp, state)
       :ok
