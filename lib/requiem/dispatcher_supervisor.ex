@@ -28,7 +28,7 @@ defmodule Requiem.DispatcherSupervisor do
   end
 
   defp children(opts) do
-    0..Keyword.fetch!(opts, :number_of_dispatchers)
+    0..(Keyword.fetch!(opts, :number_of_dispatchers) - 1)
     |> Enum.map(fn idx ->
       {DispatcherWorker,
        [

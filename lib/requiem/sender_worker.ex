@@ -10,12 +10,14 @@ defmodule Requiem.SenderWorker do
           handler: module,
           worker_index: non_neg_integer,
           socket_ptr: integer,
+          sender_ptr: integer,
           trace_id: binary
         }
 
   defstruct handler: nil,
             worker_index: 0,
             socket_ptr: 0,
+            sender_ptr: 0,
             trace_id: ""
 
   @spec child_spec(Keyword.t()) :: map
@@ -82,7 +84,7 @@ defmodule Requiem.SenderWorker do
   @impl GenServer
   def terminate(_reason, state) do
     SenderRegistry.unregister(state.handler, state.worker_index)
-    QUIC.SocketSender.destroy(state.socket_ptr)
+    QUIC.SocketSender.destroy(state.sender_ptr)
     :ok
   end
 

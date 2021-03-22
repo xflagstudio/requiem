@@ -13,7 +13,7 @@ use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, ListIterator, NifResult, ResourceArc};
 
 use crossbeam_channel::{bounded, select, unbounded, Sender, Receiver};
-use nix::sched::CpuSet;
+//use nix::sched::CpuSet;
 //use nix::sched::{sched_setaffinity, CpuSet};
 //use nix::unistd::gettid;
 use socket2::{Domain, Protocol, Socket, Type};
@@ -339,7 +339,7 @@ impl Drop for SocketCluster {
 
 #[rustler::nif]
 pub fn cpu_num() -> i32 {
-    CpuSet::count() as i32
+    num_cpus::get() as i32
 }
 
 #[rustler::nif]

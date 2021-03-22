@@ -63,7 +63,7 @@ defmodule Requiem.DispatcherWorker do
   def init(opts) do
     state = new(opts)
 
-    sender_idx = rem(state.worker_idx, state.number_of_sockets)
+    sender_idx = rem(state.worker_index, state.number_of_sockets)
     {:ok, sender_pid} = SenderRegistry.lookup(state.handler, sender_idx)
     state = %{state | sender_pid: sender_pid}
 

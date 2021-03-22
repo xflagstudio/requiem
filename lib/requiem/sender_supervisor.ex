@@ -28,7 +28,7 @@ defmodule Requiem.SenderSupervisor do
   end
 
   defp children(opts) do
-    0..Keyword.fetch!(opts, :number_of_senders)
+    0..(Keyword.fetch!(opts, :number_of_senders) - 1)
     |> Enum.map(fn idx ->
       {SenderWorker,
        [
