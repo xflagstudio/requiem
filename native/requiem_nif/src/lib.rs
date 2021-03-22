@@ -49,9 +49,11 @@ rustler::init!(
         socket::socket_sender_get,
         socket::socket_sender_send,
         socket::socket_sender_destroy,
-        socket::socket_open,
-        socket::socket_close,
+        socket::socket_new,
+        socket::socket_start,
+        socket::socket_destroy,
         socket::socket_address_parts,
+        socket::socket_address_from_string,
     ],
     load = load
 );

@@ -12,7 +12,7 @@ use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, ListIterator, NifResult, ResourceArc};
 
-use crossbeam_channel::{bounded, select, unbounded, Sender};
+use crossbeam_channel::{bounded, select, unbounded, Sender, Receiver};
 use nix::sched::CpuSet;
 //use nix::sched::{sched_setaffinity, CpuSet};
 //use nix::unistd::gettid;
@@ -45,6 +45,7 @@ pub struct SocketCluster {
     s_handles: Vec<Option<JoinHandle<()>>>,
     s_closers: Vec<Sender<()>>,
     s_senders: Vec<Sender<(SocketAddr, Vec<u8>)>>,
+    s_receivers: Vec<Receiver<(SocketAddr, Vec<u8>)>>,
     barrier: Arc<Barrier>,
     state: ClusterState,
 }
@@ -81,16 +82,28 @@ impl SocketCluster {
     }
 
     pub fn new(num_node: usize) -> Self {
+        let mut s_senders = Vec::with_capacity(num_node);
+        let mut s_receivers = Vec::with_capacity(num_node);
+        for _ in 0..num_node {
+            let (tx, rx) = unbounded::<(SocketAddr, Vec<u8>)>();
+            s_senders.push(tx);
+            s_receivers.push(rx);
+        }
         Self {
             num_node,
             r_handles: Vec::with_capacity(num_node),
             r_closers: Vec::with_capacity(num_node),
             s_handles: Vec::with_capacity(num_node),
             s_closers: Vec::with_capacity(num_node),
-            s_senders: Vec::with_capacity(num_node),
+            s_senders,
+            s_receivers,
             barrier: Arc::new(Barrier::new(num_node * 2)),
             state: ClusterState::Idle,
         }
+    }
+
+    pub fn get_num_node(&self) -> usize {
+        self.num_node
     }
 
     pub fn is_started(&self) -> bool {
@@ -271,17 +284,15 @@ impl SocketCluster {
         self.r_handles.push(Some(handle));
     }
 
-    fn start_sender_thread(&mut self, _nth: usize, sock: UdpSocket) {
+    fn start_sender_thread(&mut self, nth: usize, sock: UdpSocket) {
         let (closer_tx, closer_rx) = bounded::<()>(1);
-        let (sender_tx, sender_rx) = unbounded::<(SocketAddr, Vec<u8>)>();
-
-        self.s_senders.push(sender_tx);
         self.s_closers.push(closer_tx);
+
+        let sender_rx = self.s_receivers[nth].clone();
 
         let barrier = self.barrier.clone();
 
         let handle = thread::spawn(move || {
-
             barrier.wait();
 
             loop {
@@ -360,38 +371,45 @@ pub fn socket_sender_destroy(sender_ptr: i64) -> NifResult<Atom> {
 }
 
 #[rustler::nif]
-pub fn socket_open(
+pub fn socket_new(num_node: i32) -> NifResult<(Atom, i64)> {
+    let num_node = num_node as usize;
+    let socket = SocketCluster::new(num_node);
+
+    let socket_ptr = Box::into_raw(Box::new(socket));
+    Ok((atoms::ok(), socket_ptr as i64))
+}
+
+#[rustler::nif]
+pub fn socket_start(
+    socket_ptr: i64,
     address: Binary,
-    num_node: i32,
     pid: LocalPid,
     target_pids: ListIterator,
-) -> NifResult<(Atom, i64)> {
+) -> NifResult<Atom> {
+    let socket_ptr = socket_ptr as *mut SocketCluster;
+    let socket = unsafe { &mut *socket_ptr };
 
     let targets: Vec<LocalPid> = match target_pids.map(|x| x.decode::<LocalPid>()).collect() {
         Ok(v) => v,
         Err(_) => return Err(common::error_term(atoms::system_error())),
     };
 
-    let num_node = num_node as usize;
+    let num_node = socket.get_num_node();
     if targets.len() < num_node || targets.len() % num_node != 0 {
+        // TODO better error type
         return Err(common::error_term(atoms::system_error()));
     }
 
     let address = str::from_utf8(address.as_slice()).unwrap();
 
-    let mut socket = SocketCluster::new(num_node);
-
     match socket.start(address, &pid, &targets) {
-        Ok(()) => {
-            let socket_ptr = Box::into_raw(Box::new(socket));
-            Ok((atoms::ok(), socket_ptr as i64))
-        }
+        Ok(()) => Ok(atoms::ok()),
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
 #[rustler::nif]
-pub fn socket_close(socket_ptr: i64) -> NifResult<Atom> {
+pub fn socket_destroy(socket_ptr: i64) -> NifResult<Atom> {
     let socket_ptr = socket_ptr as *mut SocketCluster;
     unsafe { drop(Box::from_raw(socket_ptr)) };
     Ok(atoms::ok())
@@ -408,6 +426,18 @@ pub fn socket_address_parts(env: Env, peer: ResourceArc<Peer>) -> NifResult<(Ato
     ip.as_mut_slice().copy_from_slice(&ip_bytes);
 
     Ok((atoms::ok(), ip.release(env), peer.addr.port()))
+}
+
+#[rustler::nif]
+pub fn socket_address_from_string(address: Binary) -> NifResult<(Atom, ResourceArc<Peer>)> {
+    let addr = match str::from_utf8(address.as_slice()) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(common::error_term(atoms::bad_format()));
+        }
+    };
+    let addr: SocketAddr = addr.parse().unwrap();
+    Ok((atoms::ok(), ResourceArc::new(Peer::new(addr))))
 }
 
 pub fn on_load(env: Env) -> bool {

@@ -16,7 +16,7 @@ defmodule Requiem.QUIC.Config do
   end
 
   @spec new() ::
-          integer | {:error, :system_error | :not_found}
+          {:ok, integer} | {:error, :system_error | :not_found}
   def new() do
     NIF.config_new()
   end

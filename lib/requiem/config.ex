@@ -8,6 +8,7 @@ defmodule Requiem.Config do
           | :host
           | :port
           | :dispatcher_pool_size
+          | :socket_pool_size
           | :allow_address_routing
           | :token_secret
           | :connection_id_secret
@@ -40,6 +41,7 @@ defmodule Requiem.Config do
     host: "0.0.0.0",
     port: 443,
     dispatcher_pool_size: 10,
+    socket_pool_size: 0,
     allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
@@ -60,6 +62,7 @@ defmodule Requiem.Config do
     port: true,
     host: true,
     dispatcher_pool_size: true,
+    socket_pool_size: true,
     allow_address_routing: true,
     token_secret: true,
     connection_id_secret: true,

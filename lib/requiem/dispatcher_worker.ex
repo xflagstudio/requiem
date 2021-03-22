@@ -8,28 +8,32 @@ defmodule Requiem.DispatcherWorker do
   alias Requiem.ConnectionID
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherRegistry
+  alias Requiem.SenderRegistry
+  alias Requiem.SenderWorker
   alias Requiem.QUIC
   alias Requiem.RetryToken
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
-          transport: module,
           token_secret: binary,
           conn_id_secret: binary,
           worker_index: non_neg_integer,
+          number_of_sockets: non_neg_integer,
           allow_address_routing: boolean,
-          config: integer,
+          config_ptr: integer,
+          sender_pid: pid,
           packet_builder: integer,
           trace_id: binary
         }
 
   defstruct handler: nil,
-            transport: nil,
             token_secret: "",
             conn_id_secret: "",
             worker_index: 0,
-            config: 0,
+            number_of_sockets: 0,
+            config_ptr: 0,
+            sender_pid: nil,
             allow_address_routing: false,
             packet_builder: 0,
             trace_id: ""
@@ -59,7 +63,11 @@ defmodule Requiem.DispatcherWorker do
   def init(opts) do
     state = new(opts)
 
-    config = QUIC.Config.new()
+    sender_idx = rem(state.worker_idx, state.number_of_sockets)
+    {:ok, sender_pid} = SenderRegistry.lookup(state.handler, sender_idx)
+    state = %{state | sender_pid: sender_pid}
+
+    {:ok, config} = QUIC.Config.new()
 
     try do
       QUIC.init_config(state.handler, config)
@@ -77,7 +85,7 @@ defmodule Requiem.DispatcherWorker do
          ) do
       {:ok, _pid} ->
         {:ok, builder} = QUIC.PacketBuilder.new()
-        {:ok, %{state | packet_builder: builder, config: config}}
+        {:ok, %{state | packet_builder: builder, config_ptr: config}}
 
       {:error, {:already_registered, _pid}} ->
         QUIC.Config.destroy(config)
@@ -113,7 +121,7 @@ defmodule Requiem.DispatcherWorker do
   @impl GenServer
   def terminate(_reason, state) do
     DispatcherRegistry.unregister(state.handler, state.worker_index)
-    QUIC.Config.destroy(state.config)
+    QUIC.Config.destroy(state.config_ptr)
     QUIC.PacketBuilder.destroy(state.packet_builder)
     :ok
   end
@@ -150,17 +158,17 @@ defmodule Requiem.DispatcherWorker do
     %__MODULE__{
       handler: Keyword.fetch!(opts, :handler),
       worker_index: Keyword.fetch!(opts, :worker_index),
-      transport: Keyword.fetch!(opts, :transport),
+      number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
       allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
-      config: 0,
+      config_ptr: 0,
       trace_id: inspect(self())
     }
   end
 
-  defp send(address, packet, %__MODULE__{handler: handler, transport: transport}) do
-    transport.send(handler, address, packet)
+  defp send(address, packet, %__MODULE__{sender_pid: sender_pid}) do
+    SenderWorker.send(sender_pid, address, packet)
     :ok
   end
 
@@ -283,7 +291,9 @@ defmodule Requiem.DispatcherWorker do
       scid,
       dcid,
       odcid,
-      state.allow_address_routing
+      state.allow_address_routing,
+      state.config_ptr,
+      state.sender_pid
     )
   end
 

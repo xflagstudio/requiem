@@ -1,16 +1,10 @@
 defmodule RequiemTest.ConfigTest do
   use ExUnit.Case, async: true
 
-  alias Requiem.QUIC
   alias Requiem.QUIC.Config
 
   test "call initialized config" do
-    module = Module.concat(__MODULE__, Test1)
-    assert QUIC.init(module) == :ok
-    # test Config.on
-    assert QUIC.init(module) == :ok
-
-    c = Config.new()
+    {:ok, c} = Config.new()
 
     try do
       assert Config.load_cert_chain_from_pem_file(c, "") == {:error, :system_error}

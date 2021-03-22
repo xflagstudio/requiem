@@ -16,11 +16,11 @@ where
 }
 
 #[rustler::nif]
-pub fn config_new() -> NifResult<i64> {
+pub fn config_new() -> NifResult<(Atom, i64)> {
     let raw = quiche::Config::new(quiche::PROTOCOL_VERSION)
         .map_err(|_| common::error_term(atoms::system_error()))?;
     let ptr = Box::into_raw(Box::new(raw)) as i64;
-    Ok(ptr)
+    Ok((atoms::ok(), ptr))
 }
 
 #[rustler::nif]

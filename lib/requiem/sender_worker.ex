@@ -1,12 +1,10 @@
 defmodule Requiem.SenderWorker do
   require Logger
-  require Requiem.Tracer
   use GenServer
 
   alias Requiem.Address
   alias Requiem.SenderRegistry
   alias Requiem.QUIC
-  alias Requiem.Tracer
 
   @type t :: %__MODULE__{
           handler: module,
@@ -56,7 +54,12 @@ defmodule Requiem.SenderWorker do
            state.worker_index
          ) do
       {:ok, _pid} ->
-        {:ok, sender_ptr} = QUIC.SocketSender.get(state.socket_ptr)
+        {:ok, sender_ptr} =
+          QUIC.SocketSender.get(
+            state.socket_ptr,
+            state.worker_index
+          )
+
         {:ok, %{state | sender_ptr: sender_ptr}}
 
       {:error, {:already_registered, _pid}} ->
@@ -66,6 +69,12 @@ defmodule Requiem.SenderWorker do
 
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
+    QUIC.SocketSender.send(state.socket_ptr, address.raw, packet)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:__drain__, address, packet}, state) do
     QUIC.SocketSender.send(state.socket_ptr, address.raw, packet)
     {:noreply, state}
   end

@@ -34,9 +34,9 @@ defmodule Requiem.DispatcherSupervisor do
        [
          worker_index: idx,
          handler: Keyword.fetch!(opts, :handler),
-         transport: Keyword.fetch!(opts, :transport),
          token_secret: Keyword.fetch!(opts, :token_secret),
          conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
+         number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
          allow_address_routing: Keyword.fetch!(opts, :allow_address_routing)
        ]}
     end)

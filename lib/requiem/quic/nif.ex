@@ -2,7 +2,7 @@ defmodule Requiem.QUIC.NIF do
   use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
   @spec config_new() ::
-          integer | {:error, :system_error | :not_found}
+          {:ok, integer} | {:error, :system_error | :not_found}
   def config_new(), do: error()
 
   @spec config_destroy(integer) ::
@@ -93,16 +93,17 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error | :not_found}
   def config_enable_dgram(_ptr, _enabled, _recv_queue_len, _send_queue_len), do: error()
 
-  @spec connection_accept(binary, integer, binary, binary, term) ::
+  @spec connection_accept(integer, binary, binary, term, pid, non_neg_integer) ::
           {:ok, integer} | {:error, :system_error | :not_found}
-  def connection_accept(_module, _config_ptr, _scid, _odcid, _peer), do: error()
+  def connection_accept(_config_ptr, _scid, _odcid, _peer, _sender_pid, _stream_buf_size),
+    do: error()
 
   @spec connection_destroy(integer) ::
           :ok | {:error, :system_error | :not_found}
   def connection_destroy(_conn_ptr), do: error()
 
   @spec connection_close(integer, boolean, non_neg_integer, binary) ::
-          :ok | {:error, :system_error | :already_closed}
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_close(_conn, _app, _err, _reason), do: error()
 
   @spec connection_is_closed(integer) :: boolean
@@ -156,18 +157,26 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error | :not_found}
   def socket_sender_destroy(_socket_ptr), do: error()
 
-  @spec socket_open(integer, binary, pid, [pid]) ::
-          :ok | {:error, :system_error | :cant_bind}
-  def socket_open(_num_node, _address, _pid, _target_pids),
+  @spec socket_new(integer) ::
+          {:ok, integer} | {:error, :system_error | :socket_error}
+  def socket_new(_num_node),
     do: error()
 
-  @spec socket_close(binary) ::
+  @spec socket_start(integer, binary, pid, [pid]) ::
           :ok | {:error, :system_error | :not_found}
-  def socket_close(_module), do: error()
+  def socket_start(_ptr, _address, _pid, _target_pids), do: error()
+
+  @spec socket_destroy(integer) ::
+          :ok | {:error, :system_error | :not_found}
+  def socket_destroy(_ptr), do: error()
 
   @spec socket_address_parts(term) ::
           {:ok, binary, non_neg_integer}
   def socket_address_parts(_address), do: error()
+
+  @spec socket_address_from_string(binary) ::
+          {:ok, term} | {:error, :bad_format}
+  def socket_address_from_string(_address), do: error()
 
   defp error(), do: :erlang.nif_error(:nif_not_loaded)
 end

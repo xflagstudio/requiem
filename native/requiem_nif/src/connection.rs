@@ -274,12 +274,12 @@ pub fn connection_close(
     app: bool,
     err: u64,
     reason: Binary,
-) -> NifResult<Atom> {
+) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
 
     match conn.close(&env, app, err, reason.as_slice()) {
-        Ok(_) => Ok(atoms::ok()),
+        Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
 }

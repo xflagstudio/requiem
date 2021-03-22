@@ -28,4 +28,3 @@ pub(crate) mod atoms {
 pub(crate) fn error_term(reason: Atom) -> rustler::Error {
     rustler::Error::Term(Box::new(reason))
 }
-

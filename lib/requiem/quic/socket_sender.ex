@@ -1,9 +1,9 @@
 defmodule Requiem.QUIC.SocketSender do
   alias Requiem.QUIC.NIF
 
-  @spec get(integer) :: {:ok, integer} | {:error, :system_error | :not_found}
-  def get(socket_ptr) do
-    NIF.socket_sender_get(socket_ptr)
+  @spec get(integer, integer) :: {:ok, integer} | {:error, :system_error | :not_found}
+  def get(socket_ptr, idx) do
+    NIF.socket_sender_get(socket_ptr, idx)
   end
 
   @spec send(integer, term, binary) :: :ok | {:error, :system_error | :not_found}

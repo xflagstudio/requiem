@@ -1,22 +1,19 @@
 defmodule Requiem.Transport do
   use GenServer
   require Logger
-  require Requiem.Tracer
+  # require Requiem.Tracer
 
   alias Requiem.DispatcherRegistry
   alias Requiem.QUIC
-  alias Requiem.Tracer
+  # alias Requiem.Tracer
 
   @type t :: %__MODULE__{
-          handler: module
+          handler: module,
+          socket_ptr: integer
         }
 
-  defstruct handler: nil
-
-  def send(handler, address, packet) do
-    Tracer.trace(__MODULE__, "@send")
-    QUIC.Socket.send(handler, address.raw, packet)
-  end
+  defstruct handler: nil,
+            socket_ptr: 0
 
   def start_link(opts) do
     name = Keyword.fetch!(opts, :handler) |> name()
@@ -33,26 +30,22 @@ defmodule Requiem.Transport do
 
     state = new(opts)
 
-    capacity = Keyword.fetch!(opts, :event_capacity)
-    timeout = Keyword.fetch!(opts, :polling_timeout)
     host = Keyword.fetch!(opts, :host)
     port = Keyword.fetch!(opts, :port)
 
-    case QUIC.Socket.open(
-           state.handler,
+    case QUIC.Socket.start(
+           state.socket_ptr,
            host,
            port,
            self(),
-           dispatchers,
-           capacity,
-           timeout
+           dispatchers
          ) do
       :ok ->
-        Logger.info("<Requiem.Transport> opened #{host}:#{port}")
+        Logger.info("<Requiem.Transport> socket started on #{host}:#{port}")
         Process.flag(:trap_exit, true)
         {:ok, state}
 
-      {:error, :cant_bind} ->
+      {:error, :socket_error} ->
         Logger.error(
           "<Requiem.Transport> failed to bind UDP port, make sure that the values for this host(#{
             host
@@ -77,13 +70,14 @@ defmodule Requiem.Transport do
   @impl GenServer
   def terminate(reason, state) do
     Logger.info("<Requiem.Transport> @terminate: #{inspect(reason)}")
-    QUIC.Socket.close(state.handler)
+    QUIC.Socket.destroy(state.socket_ptr)
     :ok
   end
 
   defp new(opts) do
     %__MODULE__{
-      handler: Keyword.fetch!(opts, :handler)
+      handler: Keyword.fetch!(opts, :handler),
+      socket_ptr: Keyword.fetch!(opts, :socket_ptr)
     }
   end
 

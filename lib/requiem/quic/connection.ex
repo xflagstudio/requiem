@@ -1,12 +1,10 @@
 defmodule Requiem.QUIC.Connection do
   alias Requiem.QUIC.NIF
 
-  @spec accept(module, integer, binary, binary, term) ::
+  @spec accept(integer, binary, binary, term, pid, non_neg_integer) ::
           {:ok, term} | {:error, :system_error | :not_found}
-  def accept(module, config_ptr, scid, odcid, peer) do
-    module
-    |> to_string()
-    |> NIF.connection_accept(config_ptr, scid, odcid, peer)
+  def accept(config_ptr, scid, odcid, peer, sender_pid, stream_buf_size) do
+    NIF.connection_accept(config_ptr, scid, odcid, peer, sender_pid, stream_buf_size)
   end
 
   @spec destroy(integer) ::
@@ -16,7 +14,7 @@ defmodule Requiem.QUIC.Connection do
   end
 
   @spec close(integer, boolean, non_neg_integer, binary) ::
-          :ok | {:error, :system_error | :already_closed}
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def close(conn, app, err, reason) do
     NIF.connection_close(conn, app, err, reason)
   end
