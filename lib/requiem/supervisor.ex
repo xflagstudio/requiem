@@ -52,8 +52,7 @@ defmodule Requiem.Supervisor do
         socket_pool_size
       end
 
-
-    Logger.debug("num_socket: #{num_socket}");
+    Logger.debug("num_socket: #{num_socket}")
     dispatcher_pool_size = Config.get!(handler, :dispatcher_pool_size) * num_socket
 
     case QUIC.Socket.new(num_socket) do
