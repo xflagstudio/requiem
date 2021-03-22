@@ -1,169 +1,177 @@
+use std::pin::Pin;
+
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, NifResult, ResourceArc};
 
-use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RwLock};
-
-use std::convert::TryFrom;
-use std::pin::Pin;
-
-use std::collections::HashMap;
-
 use crate::common::{self, atoms};
-use crate::config::CONFIGS;
-use crate::socket::{self, Peer};
+use crate::socket::Peer;
 
-type ModuleName = Vec<u8>;
-type BufferSlot = Vec<Mutex<Box<[u8]>>>;
-type StreamDataBuffer = RwLock<HashMap<ModuleName, BufferSlot>>;
-
-static STREAM_DATA_BUFFERS: Lazy<StreamDataBuffer> = Lazy::new(|| RwLock::new(HashMap::new()));
-
-pub fn buffer_init(module: &[u8], num: u64, size: usize) {
-    let mut buffer_table = STREAM_DATA_BUFFERS.write();
-    if !buffer_table.contains_key(module) {
-        let mut slot = Vec::new();
-        for _ in 0..num {
-            let v = unsafe {
-                let mut v: Vec<u8> = Vec::with_capacity(size);
-                v.set_len(size);
-                v
-            };
-            slot.push(Mutex::new(v.into_boxed_slice()));
+macro_rules! empty_vec {
+    ($x:expr) => {
+        unsafe {
+            let mut v = Vec::with_capacity($x);
+            v.set_len($x);
+            v
         }
-        buffer_table.insert(module.to_vec(), slot);
-    }
+    };
 }
 
 pub struct Connection {
-    module: Vec<u8>,
-    conn: Pin<Box<quiche::Connection>>,
+    raw: Pin<Box<quiche::Connection>>,
     peer: ResourceArc<Peer>,
-    buf: [u8; 1350],
+    sender: LocalPid,
+    dgram_buf: Vec<u8>,
+    stream_buf: Vec<u8>,
 }
 
 impl Connection {
-    pub fn new(module: &[u8], conn: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
-        Connection {
-            module: module.to_vec(),
-            conn: conn,
-            peer: peer,
-            buf: [0; 1350],
+    pub fn new(
+        raw: Pin<Box<quiche::Connection>>,
+        peer: ResourceArc<Peer>,
+        sender: LocalPid,
+        default_stream_buf_size: usize,
+    ) -> Self {
+        Self {
+            raw,
+            peer,
+            sender,
+            dgram_buf: empty_vec!(1500),
+            stream_buf: empty_vec!(default_stream_buf_size),
         }
     }
 
-    pub fn on_packet(&mut self, env: &Env, pid: &LocalPid, packet: &mut [u8]) -> Result<u64, Atom> {
-        if !self.conn.is_closed() {
-            match self.conn.recv(packet) {
+    pub fn is_closed(&self) -> bool {
+        self.raw.is_closed()
+    }
+
+    pub fn process_packet(
+        &mut self,
+        env: &Env,
+        pid: &LocalPid,
+        packet: &mut [u8],
+    ) -> Result<u64, Atom> {
+        if !self.raw.is_closed() {
+            match self.raw.recv(packet) {
                 Ok(_len) => {
                     self.handle_stream(env, pid);
                     self.handle_dgram(env, pid);
-                    self.drain();
-                    Ok(self.next_timeout())
+                    self.drain(env);
+                    self.next_timeout()
                 }
-
-                Err(_) => Err(atoms::system_error()),
+                Err(_e) => Err(atoms::system_error()),
             }
         } else {
             Err(atoms::already_closed())
         }
     }
 
-    fn next_timeout(&mut self) -> u64 {
-        if let Some(timeout) = self.conn.timeout() {
-            let to: u64 = TryFrom::try_from(timeout.as_millis()).unwrap();
-            to
+    pub fn execute_timeout(&mut self, env: &Env) -> Result<u64, Atom> {
+        if !self.raw.is_closed() {
+            self.raw.on_timeout();
+            self.drain(env);
+            self.next_timeout()
         } else {
-            60000
+            Err(atoms::already_closed())
         }
     }
 
-    fn handle_stream(&mut self, env: &Env, pid: &LocalPid) {
-        if self.conn.is_in_early_data() || self.conn.is_established() {
-            let buffer_table = STREAM_DATA_BUFFERS.read();
-
-            if let Some(buf) = buffer_table.get(&self.module) {
-                // mitigate lock-wait
-                let mut buf = buf[common::random_slot_index(buf.len())].lock();
-
-                for s in self.conn.readable() {
-                    while let Ok((len, _fin)) = self.conn.stream_recv(s, &mut buf) {
-                        if len > 0 {
-                            let mut data = OwnedBinary::new(len).unwrap();
-                            data.as_mut_slice().copy_from_slice(&buf[..len]);
-
-                            env.send(
-                                pid,
-                                make_tuple(
-                                    *env,
-                                    &[
-                                        atoms::__stream_recv__().to_term(*env),
-                                        s.encode(*env),
-                                        data.release(*env).to_term(*env),
-                                    ],
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn stream_send(&mut self, stream_id: u64, data: &[u8]) -> Result<u64, Atom> {
+    pub fn send_stream_data(
+        &mut self,
+        env: &Env,
+        stream_id: u64,
+        data: &[u8],
+    ) -> Result<u64, Atom> {
         let size = data.len();
-
-        if !self.conn.is_closed() {
+        if !self.raw.is_closed() {
             let mut pos = 0;
             loop {
-                match self.conn.stream_send(stream_id, &data[pos..], true) {
+                match self.raw.stream_send(stream_id, &data[pos..], true) {
                     Ok(len) => {
                         pos += len;
-                        self.drain();
+                        self.drain(env);
                         if pos >= size {
                             break;
                         }
                     }
+
                     Err(quiche::Error::Done) => {
                         break;
                     }
-                    Err(_) => {
+
+                    Err(_e) => {
                         return Err(atoms::system_error());
                     }
-                };
+                }
             }
-
-            Ok(self.next_timeout())
+            self.next_timeout()
         } else {
             Err(atoms::already_closed())
         }
     }
 
-    fn dgram_send(&mut self, data: &[u8]) -> Result<u64, Atom> {
-        if !self.conn.is_closed() {
-            match self.conn.dgram_send(data) {
+    pub fn send_dgram(&mut self, env: &Env, data: &[u8]) -> Result<u64, Atom> {
+        if !self.raw.is_closed() {
+            match self.raw.dgram_send(data) {
                 Ok(()) => {
-                    self.drain();
-                    Ok(self.next_timeout())
+                    self.drain(env);
+                    self.next_timeout()
                 }
-
-                Err(_) => {
-                    return Err(atoms::system_error());
-                }
+                Err(_e) => Err(atoms::system_error()),
             }
         } else {
             Err(atoms::already_closed())
+        }
+    }
+
+    pub fn close(&mut self, env: &Env, app: bool, err: u64, reason: &[u8]) -> Result<u64, Atom> {
+        if !self.raw.is_closed() {
+            match self.raw.close(app, err, reason) {
+                Ok(()) => {
+                    self.drain(env);
+                    self.next_timeout()
+                }
+
+                Err(quiche::Error::Done) => self.next_timeout(),
+
+                Err(_e) => Err(atoms::system_error()),
+            }
+        } else {
+            Err(atoms::already_closed())
+        }
+    }
+
+    fn handle_stream(&mut self, env: &Env, pid: &LocalPid) {
+        if self.raw.is_in_early_data() || self.raw.is_established() {
+            for sid in self.raw.readable() {
+                while let Ok((len, _fin)) = self.raw.stream_recv(sid, &mut self.stream_buf) {
+                    if len > 0 {
+                        let mut data = OwnedBinary::new(len).unwrap();
+                        data.as_mut_slice().copy_from_slice(&self.stream_buf[..len]);
+                        env.send(
+                            pid,
+                            make_tuple(
+                                *env,
+                                &[
+                                    atoms::__stream_recv__().to_term(*env),
+                                    sid.encode(*env),
+                                    data.release(*env).to_term(*env),
+                                ],
+                            ),
+                        );
+                    }
+                }
+            }
         }
     }
 
     fn handle_dgram(&mut self, env: &Env, pid: &LocalPid) {
-        if self.conn.is_in_early_data() || self.conn.is_established() {
-            while let Ok(len) = self.conn.dgram_recv(&mut self.buf) {
+        if self.raw.is_in_early_data() || self.raw.is_established() {
+            while let Ok(len) = self.raw.dgram_recv(&mut self.dgram_buf) {
                 if len > 0 {
                     let mut data = OwnedBinary::new(len).unwrap();
-                    data.as_mut_slice().copy_from_slice(&self.buf[..len]);
+                    data.as_mut_slice().copy_from_slice(&self.dgram_buf[..len]);
 
                     env.send(
                         pid,
@@ -180,122 +188,106 @@ impl Connection {
         }
     }
 
-    pub fn on_timeout(&mut self) -> Result<u64, Atom> {
-        if !self.conn.is_closed() {
-            self.conn.on_timeout();
-            self.drain();
-            Ok(self.next_timeout())
-        } else {
-            Err(atoms::already_closed())
-        }
-    }
-
-    pub fn is_closed(&self) -> bool {
-        self.conn.is_closed()
-    }
-
-    pub fn close(&mut self, app: bool, err: u64, reason: &[u8]) -> Result<(), Atom> {
-        if !self.conn.is_closed() {
-            match self.conn.close(app, err, reason) {
-                Ok(()) => {
-                    self.drain();
-                    Ok(())
-                }
-
-                Err(quiche::Error::Done) => Ok(()),
-
-                Err(_) => Err(atoms::system_error()),
-            }
-        } else {
-            Err(atoms::already_closed())
-        }
-    }
-
-    fn drain(&mut self) {
+    fn drain(&mut self, env: &Env) {
         loop {
-            match self.conn.send(&mut self.buf) {
+            match self.raw.send(&mut self.dgram_buf) {
                 Ok(len) => {
-                    match socket::send_internal(&self.module, &self.peer, &self.buf[..len]) {
-                        Ok(()) => {}
-                        Err(_) => {
-                            continue;
-                        }
-                    }
+                    let mut packet = OwnedBinary::new(len).unwrap();
+                    packet
+                        .as_mut_slice()
+                        .copy_from_slice(&self.dgram_buf[..len]);
+                    env.send(
+                        &self.sender,
+                        make_tuple(
+                            *env,
+                            &[
+                                atoms::__drain__().to_term(*env),
+                                self.peer.encode(*env),
+                                packet.release(*env).to_term(*env),
+                            ],
+                        ),
+                    );
                 }
-
                 Err(quiche::Error::Done) => {
                     break;
                 }
-
-                Err(_) => {
-                    // XXX should return error?
-                    self.conn.close(false, 0x1, b"fail").ok();
+                Err(_e) => {
+                    self.raw.close(false, 0x1, b"fail").ok();
                     break;
                 }
-            };
+            }
         }
     }
-}
 
-pub struct LockedConnection {
-    conn: Mutex<Connection>,
-}
-
-impl LockedConnection {
-    pub fn new(module: &[u8], raw: Pin<Box<quiche::Connection>>, peer: ResourceArc<Peer>) -> Self {
-        LockedConnection {
-            conn: Mutex::new(Connection::new(module, raw, peer)),
+    fn next_timeout(&mut self) -> Result<u64, Atom> {
+        if let Some(timeout) = self.raw.timeout() {
+            let to: u64 = timeout.as_millis() as u64;
+            Ok(to)
+        } else if self.raw.is_closed() {
+            Err(atoms::already_closed())
+        } else {
+            // unreachable if 'idle_timeout' is set
+            Ok(60000)
         }
     }
 }
 
 #[rustler::nif]
 pub fn connection_accept(
-    module: Binary,
+    conf_ptr: i64,
     scid: Binary,
     odcid: Binary,
     peer: ResourceArc<Peer>,
-) -> NifResult<(Atom, ResourceArc<LockedConnection>)> {
-    let module = module.as_slice();
+    sender_pid: LocalPid,
+    stream_buf_size: u64,
+) -> NifResult<(Atom, i64)> {
     let scid = scid.as_slice();
     let odcid = odcid.as_slice();
 
-    let config_table = CONFIGS.read();
+    let conf_ptr = conf_ptr as *mut quiche::Config;
+    let conf = unsafe { &mut *conf_ptr };
 
-    if let Some(c) = config_table.get(module) {
-        let mut c = c.lock();
+    let scid = quiche::ConnectionId::from_ref(scid);
+    let odcid = quiche::ConnectionId::from_ref(odcid);
 
-        match quiche::accept(scid, Some(odcid), &mut c) {
-            Ok(conn) => Ok((
-                atoms::ok(),
-                ResourceArc::new(LockedConnection::new(module, conn, peer)),
-            )),
-
-            Err(_) => Err(common::error_term(atoms::system_error())),
+    match quiche::accept(&scid, Some(&odcid), conf) {
+        Ok(raw_conn) => {
+            let conn = Connection::new(raw_conn, peer, sender_pid, stream_buf_size as usize);
+            Ok((atoms::ok(), Box::into_raw(Box::new(conn)) as i64))
         }
-    } else {
-        Err(common::error_term(atoms::not_found()))
+
+        Err(_) => Err(common::error_term(atoms::system_error())),
     }
 }
 
 #[rustler::nif]
+pub fn connection_destroy(conn_ptr: i64) -> NifResult<Atom> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    unsafe { drop(Box::from_raw(conn_ptr)) };
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
 pub fn connection_close(
-    conn: ResourceArc<LockedConnection>,
+    env: Env,
+    conn_ptr: i64,
     app: bool,
     err: u64,
     reason: Binary,
-) -> NifResult<Atom> {
-    let mut conn = conn.conn.lock();
+) -> NifResult<(Atom, u64)> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
 
-    match conn.close(app, err, reason.as_slice()) {
-        Ok(_) => Ok(atoms::ok()),
+    match conn.close(&env, app, err, reason.as_slice()) {
+        Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
 #[rustler::nif]
-pub fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
-    let conn = conn.conn.lock();
+pub fn connection_is_closed(conn_ptr: i64) -> bool {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
     conn.is_closed()
 }
 
@@ -303,23 +295,26 @@ pub fn connection_is_closed(conn: ResourceArc<LockedConnection>) -> bool {
 pub fn connection_on_packet(
     env: Env,
     pid: LocalPid,
-    conn: ResourceArc<LockedConnection>,
+    conn_ptr: i64,
     packet: Binary,
 ) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
+
     let mut packet = packet.to_owned().unwrap();
 
-    match conn.on_packet(&env, &pid, &mut packet.as_mut_slice()) {
+    match conn.process_packet(&env, &pid, &mut packet.as_mut_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
 #[rustler::nif]
-pub fn connection_on_timeout(conn: ResourceArc<LockedConnection>) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
+pub fn connection_on_timeout(env: Env, conn_ptr: i64) -> NifResult<(Atom, u64)> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
 
-    match conn.on_timeout() {
+    match conn.execute_timeout(&env) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
@@ -327,30 +322,26 @@ pub fn connection_on_timeout(conn: ResourceArc<LockedConnection>) -> NifResult<(
 
 #[rustler::nif]
 pub fn connection_stream_send(
-    conn: ResourceArc<LockedConnection>,
+    env: Env,
+    conn_ptr: i64,
     stream_id: u64,
     data: Binary,
 ) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
-    match conn.stream_send(stream_id, data.as_slice()) {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
+
+    match conn.send_stream_data(&env, stream_id, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
 }
 
 #[rustler::nif]
-pub fn connection_dgram_send(
-    conn: ResourceArc<LockedConnection>,
-    data: Binary,
-) -> NifResult<(Atom, u64)> {
-    let mut conn = conn.conn.lock();
-    match conn.dgram_send(data.as_slice()) {
+pub fn connection_dgram_send(env: Env, conn_ptr: i64, data: Binary) -> NifResult<(Atom, u64)> {
+    let conn_ptr = conn_ptr as *mut Connection;
+    let conn = unsafe { &mut *conn_ptr };
+    match conn.send_dgram(&env, data.as_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
-}
-
-pub fn on_load(env: Env) -> bool {
-    rustler::resource!(LockedConnection, env);
-    true
 }
