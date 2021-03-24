@@ -394,7 +394,7 @@ defmodule Requiem.Connection do
     {:noreply, state}
   end
 
-  def handle_info({:__close__, app, err, reason}, state) do
+  def handle_info({:__close__, app, _err, reason}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@close")
 
     # TODO set proper error code
