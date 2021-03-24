@@ -1,6 +1,5 @@
 defmodule Requiem.QUIC do
   alias Requiem.Config
-  alias Requiem.QUIC.NIF
 
   @web_transport_alpn "wq-vvv-01"
 

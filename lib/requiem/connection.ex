@@ -394,10 +394,11 @@ defmodule Requiem.Connection do
     {:noreply, state}
   end
 
-  def handle_info({:__close__, app, err, reason}, state) do
+  def handle_info({:__close__, app, _err, reason}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@close")
 
-    case QUIC.Connection.close(state.conn, app, err, to_string(reason)) do
+    # TODO set proper error code
+    case QUIC.Connection.close(state.conn, app, 0x1, to_string(reason)) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
