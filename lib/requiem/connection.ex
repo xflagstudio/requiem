@@ -6,6 +6,7 @@ defmodule Requiem.Connection do
   alias Requiem.Address
   alias Requiem.AddressTable
   alias Requiem.ClientIndication
+  alias Requiem.Config
   alias Requiem.ExceptionGuard
   alias Requiem.ErrorCode
   alias Requiem.ConnectionRegistry
@@ -426,10 +427,10 @@ defmodule Requiem.Connection do
     {:stop, reason, state}
   end
 
-  def handle_info({:__stream_send__, stream_id, data}, state) do
+  def handle_info({:__stream_send__, stream_id, data, fin}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@stream_send")
 
-    case QUIC.Connection.stream_send(state.conn, stream_id, data) do
+    case QUIC.Connection.stream_send(state.conn, stream_id, data, fin) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -686,14 +687,15 @@ defmodule Requiem.Connection do
         <<head::binary-size(4), _rest::binary>> -> Base.encode16(head)
         _ -> "----"
       end
+    handler = Keyword.fetch!(opts, :handler)
 
     %__MODULE__{
-      handler: Keyword.fetch!(opts, :handler),
+      handler: handler,
       handler_state: nil,
       handler_initialized: false,
       allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       trace_id: trace_id,
-      web_transport: Keyword.get(opts, :web_transport, true),
+      web_transport: Config.get!(handler, :web_transport),
       conn_state: ConnectionState.new(address, dcid, scid, odcid),
       conn: nil,
       timer: nil

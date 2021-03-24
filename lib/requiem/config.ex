@@ -37,7 +37,7 @@ defmodule Requiem.Config do
           | :enable_dgram
 
   @default_values [
-    web_transport: true,
+    web_transport: false,
     host: "0.0.0.0",
     port: 443,
     dispatcher_pool_size: 10,

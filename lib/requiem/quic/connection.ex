@@ -30,10 +30,10 @@ defmodule Requiem.QUIC.Connection do
     NIF.connection_dgram_send(conn, data)
   end
 
-  @spec stream_send(integer, non_neg_integer, binary) ::
+  @spec stream_send(integer, non_neg_integer, binary, boolean) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def stream_send(conn, stream_id, data) do
-    NIF.connection_stream_send(conn, stream_id, data)
+  def stream_send(conn, stream_id, data, fin) do
+    NIF.connection_stream_send(conn, stream_id, data, fin)
   end
 
   @spec on_packet(integer, binary) ::

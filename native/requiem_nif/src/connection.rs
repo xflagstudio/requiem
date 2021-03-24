@@ -82,12 +82,13 @@ impl Connection {
         env: &Env,
         stream_id: u64,
         data: &[u8],
+        fin: bool,
     ) -> Result<u64, Atom> {
         let size = data.len();
         if !self.raw.is_closed() {
             let mut pos = 0;
             loop {
-                match self.raw.stream_send(stream_id, &data[pos..], true) {
+                match self.raw.stream_send(stream_id, &data[pos..], fin) {
                     Ok(len) => {
                         pos += len;
                         self.drain(env);
@@ -326,11 +327,12 @@ pub fn connection_stream_send(
     conn_ptr: i64,
     stream_id: u64,
     data: Binary,
+    fin: bool,
 ) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
 
-    match conn.send_stream_data(&env, stream_id, data.as_slice()) {
+    match conn.send_stream_data(&env, stream_id, data.as_slice(), fin) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }

@@ -117,9 +117,9 @@ defmodule Requiem.QUIC.NIF do
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_on_timeout(_conn), do: error()
 
-  @spec connection_stream_send(integer, non_neg_integer, binary) ::
+  @spec connection_stream_send(integer, non_neg_integer, binary, boolean) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_stream_send(_conn, _stream_id, _data), do: error()
+  def connection_stream_send(_conn, _stream_id, _data, _fin), do: error()
 
   @spec connection_dgram_send(integer, binary) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
