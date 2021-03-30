@@ -9,7 +9,7 @@ defmodule Requiem.ExceptionGuard do
         stacktrace = __STACKTRACE__ |> Exception.format_stacktrace()
 
         Logger.error(
-          "<Requiem.Connection:#{self()}> rescued error - #{inspect(err)}, stacktrace - #{
+          "<Requiem.Connection:#{inspect(self())}> rescued error - #{inspect(err)}, stacktrace - #{
             stacktrace
           }"
         )
@@ -20,7 +20,7 @@ defmodule Requiem.ExceptionGuard do
         stacktrace = __STACKTRACE__ |> Exception.format_stacktrace()
 
         Logger.error(
-          "<Requiem.Connection:#{self()}> caught error - #{inspect(value)}, stacktrace - #{
+          "<Requiem.Connection:#{inspect(self())}> caught error - #{inspect(value)}, stacktrace - #{
             stacktrace
           }"
         )
