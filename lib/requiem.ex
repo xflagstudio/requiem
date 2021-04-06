@@ -353,10 +353,10 @@ defmodule Requiem do
       @spec close(non_neg_integer, atom) :: no_return
       def close(code, reason), do: send(self(), {:__close__, true, code, reason})
 
-      @spec stream_send(non_neg_integer, binary) :: no_return
-      def stream_send(stream_id, data) do
+      @spec stream_send(non_neg_integer, binary, boolean) :: no_return
+      def stream_send(stream_id, data, fin) do
         if Requiem.StreamId.is_writable?(stream_id) do
-          send(self(), {:__stream_send__, stream_id, data})
+          send(self(), {:__stream_send__, stream_id, data, fin})
         else
           Logger.error(
             "<Requiem.Connection> You can't send data on this stream[stream_id: #{stream_id}]. This stream is not writable."

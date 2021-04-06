@@ -1,15 +1,4 @@
-defmodule Requiem.DispatcherRegistry do
-  @spec gather(module, non_neg_integer) :: [pid]
-  def gather(handler, number_of_workers) do
-    0..(number_of_workers - 1)
-    |> Enum.flat_map(fn index ->
-      case lookup(handler, index) do
-        {:ok, pid} -> [pid]
-        _ -> []
-      end
-    end)
-  end
-
+defmodule Requiem.SenderRegistry do
   @spec register(module, non_neg_integer) ::
           {:ok, pid()}
           | {:error, {:already_registered, pid()}}

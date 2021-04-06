@@ -3,8 +3,6 @@ import Config
 config :requiem_echo, RequiemEcho.Handler,
   host: "0.0.0.0",
   port: 3000,
-  socket_event_capacity: 1024,
-  socket_polling_timeout: 100,
   cert_chain: System.get_env("CERT"),
   priv_key: System.get_env("PRIV_KEY"),
   max_idle_timeout: 60_000,
@@ -19,3 +17,4 @@ config :requiem_echo, RequiemEcho.Handler,
   enable_early_data: true,
   enable_dgram: true
 
+config :requiem, trace: true

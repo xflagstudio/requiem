@@ -1,21 +1,7 @@
 use rustler::types::binary::{Binary, OwnedBinary};
-use rustler::{Atom, Env, NifResult, ResourceArc};
+use rustler::{Atom, Env, NifResult};
 
-use parking_lot::Mutex;
-
-use crate::common::{self, atoms};
-
-pub struct PacketBuildBuffer {
-    buf: Mutex<[u8; 1350]>,
-}
-
-impl PacketBuildBuffer {
-    pub fn new() -> Self {
-        PacketBuildBuffer {
-            buf: Mutex::new([0; 1350]),
-        }
-    }
-}
+use crate::common::atoms;
 
 pub(crate) fn packet_type(ty: quiche::Type) -> Atom {
     match ty {
@@ -34,8 +20,7 @@ pub(crate) fn header_token_binary(hdr: &quiche::Header) -> OwnedBinary {
         token.as_mut_slice().copy_from_slice(&t);
         token
     } else {
-        let empty = OwnedBinary::new(0).unwrap();
-        empty
+        OwnedBinary::new(0).unwrap()
     }
 }
 
@@ -51,90 +36,91 @@ pub(crate) fn header_scid_binary(hdr: &quiche::Header) -> OwnedBinary {
     scid
 }
 
-#[rustler::nif]
-pub fn packet_build_buffer_create() -> NifResult<(Atom, ResourceArc<PacketBuildBuffer>)> {
-    Ok((atoms::ok(), ResourceArc::new(PacketBuildBuffer::new())))
+pub struct PacketBuilder {
+    buf: [u8; 1500],
 }
 
-#[rustler::nif]
-pub fn packet_parse_header<'a>(
-    env: Env<'a>,
-    packet: Binary,
-) -> NifResult<(Atom, Binary<'a>, Binary<'a>, Binary<'a>, u32, Atom, bool)> {
-    let mut packet = packet.to_owned().unwrap();
+impl PacketBuilder {
+    pub fn new() -> Self {
+        PacketBuilder { buf: [0; 1500] }
+    }
 
-    match quiche::Header::from_slice(&mut packet.as_mut_slice(), quiche::MAX_CONN_ID_LEN) {
-        Ok(hdr) => {
-            let scid = header_scid_binary(&hdr);
-            let dcid = header_dcid_binary(&hdr);
-            let token = header_token_binary(&hdr);
+    pub fn build_negotiate_version(&mut self, scid: &[u8], dcid: &[u8]) -> OwnedBinary {
+        let scid = quiche::ConnectionId::from_ref(scid);
+        let dcid = quiche::ConnectionId::from_ref(dcid);
+        let len = quiche::negotiate_version(&scid, &dcid, &mut self.buf).unwrap();
 
-            let version = hdr.version;
+        let mut resp = OwnedBinary::new(len).unwrap();
+        resp.as_mut_slice().copy_from_slice(&self.buf[..len]);
+        resp
+    }
 
-            let typ = packet_type(hdr.ty);
-            let is_version_supported = quiche::version_is_supported(hdr.version);
-
-            Ok((
-                atoms::ok(),
-                scid.release(env),
-                dcid.release(env),
-                token.release(env),
-                version,
-                typ,
-                is_version_supported,
-            ))
-        }
-
-        Err(_) => Err(common::error_term(atoms::bad_format())),
+    pub fn build_retry(
+        &mut self,
+        scid: &[u8],
+        dcid: &[u8],
+        odcid: &[u8],
+        token: &[u8],
+        version: u32,
+    ) -> OwnedBinary {
+        let scid = quiche::ConnectionId::from_ref(scid);
+        let dcid = quiche::ConnectionId::from_ref(dcid);
+        let odcid = quiche::ConnectionId::from_ref(odcid);
+        let len = quiche::retry(&scid, &odcid, &dcid, &token, version, &mut self.buf).unwrap();
+        let mut resp = OwnedBinary::new(len).unwrap();
+        resp.as_mut_slice().copy_from_slice(&self.buf[..len]);
+        resp
     }
 }
 
 #[rustler::nif]
-pub fn packet_build_negotiate_version<'a>(
+pub fn packet_builder_new() -> NifResult<(Atom, i64)> {
+    let ptr = Box::into_raw(Box::new(PacketBuilder::new()));
+    Ok((atoms::ok(), ptr as i64))
+}
+
+#[rustler::nif]
+pub fn packet_builder_destroy(builder_ptr: i64) -> NifResult<Atom> {
+    let builder_ptr = builder_ptr as *mut PacketBuilder;
+    unsafe { drop(Box::from_raw(builder_ptr)) };
+    Ok(atoms::ok())
+}
+
+#[rustler::nif]
+pub fn packet_builder_build_negotiate_version<'a>(
     env: Env<'a>,
-    buffer: ResourceArc<PacketBuildBuffer>,
+    builder_ptr: i64,
     scid: Binary,
     dcid: Binary,
 ) -> NifResult<(Atom, Binary<'a>)> {
-    let mut buf = buffer.buf.lock();
+    let builder_ptr = builder_ptr as *mut PacketBuilder;
+    let builder = unsafe { &mut *builder_ptr };
 
-    let scid = scid.as_slice();
-    let dcid = dcid.as_slice();
-
-    let len = quiche::negotiate_version(&scid, &dcid, &mut *buf).unwrap();
-
-    let mut resp = OwnedBinary::new(len).unwrap();
-    resp.as_mut_slice().copy_from_slice(&buf[..len]);
+    let resp = builder.build_negotiate_version(scid.as_slice(), dcid.as_slice());
 
     Ok((atoms::ok(), resp.release(env)))
 }
 
 #[rustler::nif]
-pub fn packet_build_retry<'a>(
+pub fn packet_builder_build_retry<'a>(
     env: Env<'a>,
-    buffer: ResourceArc<PacketBuildBuffer>,
+    builder_ptr: i64,
     scid: Binary,
     odcid: Binary,
     dcid: Binary,
     token: Binary,
     version: u32,
 ) -> NifResult<(Atom, Binary<'a>)> {
-    let mut buf = buffer.buf.lock();
+    let builder_ptr = builder_ptr as *mut PacketBuilder;
+    let builder = unsafe { &mut *builder_ptr };
 
-    let scid = scid.as_slice();
-    let odcid = odcid.as_slice();
-    let dcid = dcid.as_slice();
-    let token = token.as_slice();
-
-    let len = quiche::retry(&scid, &odcid, &dcid, &token, version, &mut *buf).unwrap();
-
-    let mut resp = OwnedBinary::new(len).unwrap();
-    resp.as_mut_slice().copy_from_slice(&buf[..len]);
+    let resp = builder.build_retry(
+        scid.as_slice(),
+        dcid.as_slice(),
+        odcid.as_slice(),
+        token.as_slice(),
+        version,
+    );
 
     Ok((atoms::ok(), resp.release(env)))
-}
-
-pub fn on_load(env: Env) -> bool {
-    rustler::resource!(PacketBuildBuffer, env);
-    true
 }

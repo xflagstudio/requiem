@@ -1,7 +1,7 @@
-defmodule Requiem.DispatcherSupervisor do
+defmodule Requiem.SenderSupervisor do
   use Supervisor
 
-  alias Requiem.DispatcherWorker
+  alias Requiem.SenderWorker
 
   @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
   def child_spec(opts) do
@@ -28,16 +28,13 @@ defmodule Requiem.DispatcherSupervisor do
   end
 
   defp children(opts) do
-    0..(Keyword.fetch!(opts, :number_of_dispatchers) - 1)
+    0..(Keyword.fetch!(opts, :number_of_senders) - 1)
     |> Enum.map(fn idx ->
-      {DispatcherWorker,
+      {SenderWorker,
        [
          worker_index: idx,
          handler: Keyword.fetch!(opts, :handler),
-         token_secret: Keyword.fetch!(opts, :token_secret),
-         conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
-         number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
-         allow_address_routing: Keyword.fetch!(opts, :allow_address_routing)
+         socket_ptr: Keyword.fetch!(opts, :socket_ptr)
        ]}
     end)
     |> Enum.reduce([], fn x, acc -> [x | acc] end)

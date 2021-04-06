@@ -1,26 +1,25 @@
-defmodule Requiem.QUIC.Packet do
+defmodule Requiem.QUIC.PacketBuilder do
   alias Requiem.QUIC.NIF
 
-  @spec parse_header(binary) ::
-          {:ok, binary, binary, binary, non_neg_integer, atom, boolean}
-          | {:error, :system_error | :bad_format}
-  def parse_header(packet) do
-    NIF.packet_parse_header(packet)
+  @spec new() :: {:ok, integer} | {:error, :system_error}
+  def new() do
+    NIF.packet_builder_new()
   end
 
-  @spec create_buffer() :: {:ok, term} | {:error, :system_error}
-  def create_buffer() do
-    NIF.packet_build_buffer_create()
+  @spec destroy(integer) :: :ok | {:error, :system_error}
+  def destroy(builder) do
+    NIF.packet_builder_destroy(builder)
   end
 
-  @spec build_negotiate_version(term, binary, binary) :: {:ok, binary} | {:error, :system_error}
-  def build_negotiate_version(buffer, scid, dcid) do
-    NIF.packet_build_negotiate_version(buffer, scid, dcid)
-  end
-
-  @spec build_retry(term, binary, binary, binary, binary, non_neg_integer) ::
+  @spec build_negotiate_version(integer, binary, binary) ::
           {:ok, binary} | {:error, :system_error}
-  def build_retry(buffer, scid, dcid, new_scid, token, version) do
-    NIF.packet_build_retry(buffer, scid, dcid, new_scid, token, version)
+  def build_negotiate_version(builder, scid, dcid) do
+    NIF.packet_builder_build_negotiate_version(builder, scid, dcid)
+  end
+
+  @spec build_retry(integer, binary, binary, binary, binary, non_neg_integer) ::
+          {:ok, binary} | {:error, :system_error}
+  def build_retry(builder, scid, dcid, new_scid, token, version) do
+    NIF.packet_builder_build_retry(builder, scid, dcid, new_scid, token, version)
   end
 end

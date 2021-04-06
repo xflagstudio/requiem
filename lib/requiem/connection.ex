@@ -6,6 +6,7 @@ defmodule Requiem.Connection do
   alias Requiem.Address
   alias Requiem.AddressTable
   alias Requiem.ClientIndication
+  alias Requiem.Config
   alias Requiem.ExceptionGuard
   alias Requiem.ErrorCode
   alias Requiem.ConnectionRegistry
@@ -52,28 +53,50 @@ defmodule Requiem.Connection do
     state = new(opts)
     Tracer.trace(__MODULE__, state.trace_id, "@init")
 
-    Process.flag(:trap_exit, true)
+    config_ptr = Keyword.fetch!(opts, :config_ptr)
+    sender_pid = Keyword.fetch!(opts, :sender_pid)
 
-    case ConnectionRegistry.register(
-           state.handler,
-           state.conn_state.dcid
+    case QUIC.Connection.accept(
+           config_ptr,
+           state.conn_state.dcid,
+           state.conn_state.odcid,
+           state.conn_state.address.raw,
+           sender_pid,
+           1024 * 10
          ) do
-      {:ok, _pid} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
+      {:ok, conn} ->
+        Tracer.trace(__MODULE__, state.trace_id, "@acccept: completed")
+        Process.flag(:trap_exit, true)
 
-        if state.allow_address_routing do
-          AddressTable.insert(
-            state.handler,
-            state.conn_state.address,
-            state.conn_state.dcid
-          )
+        case ConnectionRegistry.register(
+               state.handler,
+               state.conn_state.dcid
+             ) do
+          {:ok, _pid} ->
+            Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
+
+            if state.allow_address_routing do
+              AddressTable.insert(
+                state.handler,
+                state.conn_state.address,
+                state.conn_state.dcid
+              )
+            end
+
+            unless state.web_transport do
+              send(self(), :__handler_init__)
+            end
+
+            {:ok, %{state | conn: conn}}
+
+          {:error, {:already_registered, _pid}} ->
+            Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
+            QUIC.Connection.destroy(conn)
+            {:stop, :normal}
         end
 
-        send(self(), :__accept__)
-        {:ok, state}
-
-      {:error, {:already_registered, _pid}} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
+      {:error, _reason} ->
+        Tracer.trace(__MODULE__, state.trace_id, "failed to accept connection, stop process.")
         {:stop, :normal}
     end
   end
@@ -216,30 +239,9 @@ defmodule Requiem.Connection do
   end
 
   @impl GenServer
-  def handle_info(:__accept__, state) do
-    Tracer.trace(__MODULE__, state.trace_id, "@acccept")
-
-    case QUIC.Connection.accept(
-           state.handler,
-           state.conn_state.dcid,
-           state.conn_state.odcid,
-           state.conn_state.address.raw
-         ) do
-      {:ok, conn} ->
-        Tracer.trace(__MODULE__, state.trace_id, "@acccept: completed")
-
-        if state.web_transport do
-          # just set conn, don't call handler_init here
-          {:noreply, %{state | conn: conn}}
-        else
-          Tracer.trace(__MODULE__, state.trace_id, "@acccept: handler.init")
-          handler_init(conn, nil, state)
-        end
-
-      {:error, _reason} ->
-        Tracer.trace(__MODULE__, state.trace_id, "failed to accept connection, stop process.")
-        {:stop, :normal, state}
-    end
+  def handle_info(:__handler_init__, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@handler_init")
+    handler_init(state.conn, nil, state)
   end
 
   def handle_info(:__timeout__, state) do
@@ -393,24 +395,31 @@ defmodule Requiem.Connection do
     {:noreply, state}
   end
 
-  def handle_info({:__close__, app, err, reason}, state) do
+  def handle_info({:__close__, app, _err, reason}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@close")
 
-    case QUIC.Connection.close(state.conn, app, err, to_string(reason)) do
-      :ok ->
-        Tracer.trace(__MODULE__, state.trace_id, "@close: completed, set delayed close")
-        send(self(), {:__delayed_close__, {:shutdown, reason}})
+    # TODO set proper error code
+    case QUIC.Connection.close(state.conn, app, 0x1, to_string(reason)) do
+      {:ok, next_timeout} ->
+        Tracer.trace(
+          __MODULE__,
+          state.trace_id,
+          "@close: completed. next_timeout: #{next_timeout}"
+        )
+
+        state = reset_conn_timer(state, next_timeout)
+        {:noreply, state}
 
       {:error, :already_closed} ->
         Tracer.trace(__MODULE__, state.trace_id, "@close: already closed, set delayed close")
         send(self(), {:__delayed_close__, :normal})
+        {:noreply, state}
 
       {:error, :system_error} ->
         Tracer.trace(__MODULE__, state.trace_id, "@close: error, set delayed close")
         send(self(), {:__delayed_close__, {:shutdown, :system_error}})
+        {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   def handle_info({:__delayed_close__, reason}, state) do
@@ -418,10 +427,10 @@ defmodule Requiem.Connection do
     {:stop, reason, state}
   end
 
-  def handle_info({:__stream_send__, stream_id, data}, state) do
+  def handle_info({:__stream_send__, stream_id, data, fin}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@stream_send")
 
-    case QUIC.Connection.stream_send(state.conn, stream_id, data) do
+    case QUIC.Connection.stream_send(state.conn, stream_id, data, fin) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -606,6 +615,8 @@ defmodule Requiem.Connection do
     Tracer.trace(__MODULE__, state.trace_id, "@terminate #{inspect(reason)}")
 
     state = cancel_conn_timer(state)
+    QUIC.Connection.destroy(state.conn)
+    state = %{state | conn: nil}
 
     ConnectionRegistry.unregister(
       state.handler,
@@ -676,14 +687,15 @@ defmodule Requiem.Connection do
         <<head::binary-size(4), _rest::binary>> -> Base.encode16(head)
         _ -> "----"
       end
+    handler = Keyword.fetch!(opts, :handler)
 
     %__MODULE__{
-      handler: Keyword.fetch!(opts, :handler),
+      handler: handler,
       handler_state: nil,
       handler_initialized: false,
       allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       trace_id: trace_id,
-      web_transport: Keyword.get(opts, :web_transport, true),
+      web_transport: Config.get!(handler, :web_transport),
       conn_state: ConnectionState.new(address, dcid, scid, odcid),
       conn: nil,
       timer: nil
