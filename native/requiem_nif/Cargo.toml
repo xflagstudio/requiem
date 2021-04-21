@@ -13,5 +13,5 @@ crate-type = ["dylib"]
 rustler = "0.22.0-rc.0"
 socket2 = { version= "0.2", features = ["reuseport"] }
 num_cpus = "1.0"
-quiche = "0.7.0"
+quiche = "0.8"
 crossbeam-channel = "0.5"
