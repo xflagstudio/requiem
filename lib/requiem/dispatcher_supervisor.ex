@@ -28,15 +28,15 @@ defmodule Requiem.DispatcherSupervisor do
   end
 
   defp children(opts) do
-    0..Keyword.fetch!(opts, :number_of_dispatchers)
+    0..(Keyword.fetch!(opts, :number_of_dispatchers) - 1)
     |> Enum.map(fn idx ->
       {DispatcherWorker,
        [
          worker_index: idx,
          handler: Keyword.fetch!(opts, :handler),
-         transport: Keyword.fetch!(opts, :transport),
          token_secret: Keyword.fetch!(opts, :token_secret),
          conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
+         number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
          allow_address_routing: Keyword.fetch!(opts, :allow_address_routing)
        ]}
     end)

@@ -1,5 +1,8 @@
 # ReQUIem
 
+[![hex.pm version](https://img.shields.io/hexpm/v/requiem.svg)](https://hex.pm/packages/requiem)
+[![hex.pm](https://img.shields.io/hexpm/l/requiem.svg)](https://github.com/xflagstudio/requiem/blob/master/LICENSE)
+
 ## Description
 
 This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
@@ -32,7 +35,7 @@ by adding `requiem` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:requiem, "~> 0.2.0-rc.0"}
+    {:requiem, "~> 0.3.0-rc.0"}
   ]
 end
 ```

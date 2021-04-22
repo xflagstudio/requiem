@@ -15,171 +15,139 @@ defmodule Requiem.QUIC.Config do
     end
   end
 
-  @spec load_cert_chain_from_pem_file(module, binary) ::
+  @spec new() ::
+          {:ok, integer} | {:error, :system_error | :not_found}
+  def new() do
+    NIF.config_new()
+  end
+
+  @spec destroy(integer) ::
           :ok | {:error, :system_error | :not_found}
-  def load_cert_chain_from_pem_file(module, file) do
-    module
-    |> to_string()
-    |> NIF.config_load_cert_chain_from_pem_file(file)
+  def destroy(ptr) do
+    NIF.config_destroy(ptr)
   end
 
-  @spec load_priv_key_from_pem_file(module, binary) :: :ok | {:error, :system_error | :not_found}
-  def load_priv_key_from_pem_file(module, file) do
-    module
-    |> to_string()
-    |> NIF.config_load_priv_key_from_pem_file(file)
-  end
-
-  @spec load_verify_locations_from_file(module, binary) ::
+  @spec load_cert_chain_from_pem_file(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def load_verify_locations_from_file(module, file) do
-    module
-    |> to_string()
-    |> NIF.config_load_verify_locations_from_file(file)
+  def load_cert_chain_from_pem_file(ptr, file) do
+    NIF.config_load_cert_chain_from_pem_file(ptr, file)
   end
 
-  @spec load_verify_locations_from_directory(module, binary) ::
+  @spec load_priv_key_from_pem_file(integer, binary) :: :ok | {:error, :system_error | :not_found}
+  def load_priv_key_from_pem_file(ptr, file) do
+    NIF.config_load_priv_key_from_pem_file(ptr, file)
+  end
+
+  @spec load_verify_locations_from_file(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def load_verify_locations_from_directory(module, dir) do
-    module
-    |> to_string()
-    |> NIF.config_load_verify_locations_from_directory(dir)
+  def load_verify_locations_from_file(ptr, file) do
+    NIF.config_load_verify_locations_from_file(ptr, file)
   end
 
-  @spec verify_peer(module, boolean) :: :ok | {:error, :system_error | :not_found}
-  def verify_peer(module, verify) do
-    module
-    |> to_string()
-    |> NIF.config_verify_peer(verify)
-  end
-
-  @spec grease(module, boolean) :: :ok | {:error, :system_error | :not_found}
-  def grease(module, grease) do
-    module
-    |> to_string()
-    |> NIF.config_grease(grease)
-  end
-
-  @spec enable_early_data(module) :: :ok | {:error, :system_error | :not_found}
-  def enable_early_data(module) do
-    module
-    |> to_string()
-    |> NIF.config_enable_early_data()
-  end
-
-  @spec set_application_protos(module, list) :: :ok | {:error, :system_error | :not_found}
-  def set_application_protos(module, protos) do
-    module
-    |> to_string()
-    |> NIF.config_set_application_protos(ALPN.encode_list(protos))
-  end
-
-  @spec set_max_idle_timeout(module, non_neg_integer) ::
+  @spec load_verify_locations_from_directory(integer, binary) ::
           :ok | {:error, :system_error | :not_found}
-  def set_max_idle_timeout(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_max_idle_timeout(v)
+  def load_verify_locations_from_directory(ptr, dir) do
+    NIF.config_load_verify_locations_from_directory(ptr, dir)
   end
 
-  @spec set_max_udp_payload_size(module, non_neg_integer) ::
+  @spec verify_peer(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def verify_peer(ptr, verify) do
+    NIF.config_verify_peer(ptr, verify)
+  end
+
+  @spec grease(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def grease(ptr, grease) do
+    NIF.config_grease(ptr, grease)
+  end
+
+  @spec enable_early_data(integer) :: :ok | {:error, :system_error | :not_found}
+  def enable_early_data(ptr) do
+    NIF.config_enable_early_data(ptr)
+  end
+
+  @spec set_application_protos(integer, list) :: :ok | {:error, :system_error | :not_found}
+  def set_application_protos(ptr, protos) do
+    NIF.config_set_application_protos(ptr, ALPN.encode_list(protos))
+  end
+
+  @spec set_max_idle_timeout(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_max_udp_payload_size(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_max_udp_payload_size(v)
+  def set_max_idle_timeout(ptr, v) do
+    NIF.config_set_max_idle_timeout(ptr, v)
   end
 
-  @spec set_initial_max_data(module, non_neg_integer) ::
+  @spec set_max_udp_payload_size(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_data(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_data(v)
+  def set_max_udp_payload_size(ptr, v) do
+    NIF.config_set_max_udp_payload_size(ptr, v)
   end
 
-  @spec set_initial_max_stream_data_bidi_local(module, non_neg_integer) ::
+  @spec set_initial_max_data(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_stream_data_bidi_local(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_stream_data_bidi_local(v)
+  def set_initial_max_data(ptr, v) do
+    NIF.config_set_initial_max_data(ptr, v)
   end
 
-  @spec set_initial_max_stream_data_bidi_remote(module, non_neg_integer) ::
+  @spec set_initial_max_stream_data_bidi_local(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_stream_data_bidi_remote(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_stream_data_bidi_remote(v)
+  def set_initial_max_stream_data_bidi_local(ptr, v) do
+    NIF.config_set_initial_max_stream_data_bidi_local(ptr, v)
   end
 
-  @spec set_initial_max_stream_data_uni(module, non_neg_integer) ::
+  @spec set_initial_max_stream_data_bidi_remote(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_stream_data_uni(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_stream_data_uni(v)
+  def set_initial_max_stream_data_bidi_remote(ptr, v) do
+    NIF.config_set_initial_max_stream_data_bidi_remote(ptr, v)
   end
 
-  @spec set_initial_max_streams_bidi(module, non_neg_integer) ::
+  @spec set_initial_max_stream_data_uni(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_streams_bidi(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_streams_bidi(v)
+  def set_initial_max_stream_data_uni(ptr, v) do
+    NIF.config_set_initial_max_stream_data_uni(ptr, v)
   end
 
-  @spec set_initial_max_streams_uni(module, non_neg_integer) ::
+  @spec set_initial_max_streams_bidi(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_initial_max_streams_uni(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_initial_max_streams_uni(v)
+  def set_initial_max_streams_bidi(ptr, v) do
+    NIF.config_set_initial_max_streams_bidi(ptr, v)
   end
 
-  @spec set_ack_delay_exponent(module, non_neg_integer) ::
+  @spec set_initial_max_streams_uni(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_ack_delay_exponent(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_ack_delay_exponent(v)
+  def set_initial_max_streams_uni(ptr, v) do
+    NIF.config_set_initial_max_streams_uni(ptr, v)
   end
 
-  @spec set_max_ack_delay(module, non_neg_integer) :: :ok | {:error, :system_error | :not_found}
-  def set_max_ack_delay(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_max_ack_delay(v)
-  end
-
-  @spec set_disable_active_migration(module, boolean) ::
+  @spec set_ack_delay_exponent(integer, non_neg_integer) ::
           :ok | {:error, :system_error | :not_found}
-  def set_disable_active_migration(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_set_disable_active_migration(v)
+  def set_ack_delay_exponent(ptr, v) do
+    NIF.config_set_ack_delay_exponent(ptr, v)
   end
 
-  @spec set_cc_algorithm_name(module, binary) :: :ok | {:error, :system_error | :not_found}
-  def set_cc_algorithm_name(module, name) do
-    module
-    |> to_string()
-    |> NIF.config_set_cc_algorithm_name(name)
+  @spec set_max_ack_delay(integer, non_neg_integer) :: :ok | {:error, :system_error | :not_found}
+  def set_max_ack_delay(ptr, v) do
+    NIF.config_set_max_ack_delay(ptr, v)
   end
 
-  @spec enable_hystart(module, boolean) :: :ok | {:error, :system_error | :not_found}
-  def enable_hystart(module, v) do
-    module
-    |> to_string()
-    |> NIF.config_enable_hystart(v)
-  end
-
-  @spec enable_dgram(module, boolean, non_neg_integer, non_neg_integer) ::
+  @spec set_disable_active_migration(integer, boolean) ::
           :ok | {:error, :system_error | :not_found}
-  def enable_dgram(module, enabled, recv_queue_len, send_queue_len) do
-    module
-    |> to_string()
-    |> NIF.config_enable_dgram(enabled, recv_queue_len, send_queue_len)
+  def set_disable_active_migration(ptr, v) do
+    NIF.config_set_disable_active_migration(ptr, v)
+  end
+
+  @spec set_cc_algorithm_name(integer, binary) :: :ok | {:error, :system_error | :not_found}
+  def set_cc_algorithm_name(ptr, name) do
+    NIF.config_set_cc_algorithm_name(ptr, name)
+  end
+
+  @spec enable_hystart(integer, boolean) :: :ok | {:error, :system_error | :not_found}
+  def enable_hystart(ptr, v) do
+    NIF.config_enable_hystart(ptr, v)
+  end
+
+  @spec enable_dgram(integer, boolean, non_neg_integer, non_neg_integer) ::
+          :ok | {:error, :system_error | :not_found}
+  def enable_dgram(ptr, enabled, recv_queue_len, send_queue_len) do
+    NIF.config_enable_dgram(ptr, enabled, recv_queue_len, send_queue_len)
   end
 end

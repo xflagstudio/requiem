@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.2.0-rc.0",
+      version: "0.3.0-rc.0",
       elixir: "~> 1.11",
       package: package(),
       compilers: [:rustler] ++ Mix.compilers(),
@@ -30,8 +30,9 @@ defmodule Requiem.MixProject do
     ]
   end
 
-  defp rustc_mode(:prod), do: :release
-  defp rustc_mode(_), do: :debug
+  defp rustc_mode(_), do: :release
+  # defp rustc_mode(:prod), do: :release
+  # defp rustc_mode(_), do: :debug
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
