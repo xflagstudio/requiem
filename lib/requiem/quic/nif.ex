@@ -157,9 +157,9 @@ defmodule Requiem.QUIC.NIF do
           :ok | {:error, :system_error | :not_found}
   def socket_sender_destroy(_socket_ptr), do: error()
 
-  @spec socket_new(integer) ::
+  @spec socket_new(integer, non_neg_integer, non_neg_integer) ::
           {:ok, integer} | {:error, :system_error | :socket_error}
-  def socket_new(_num_node),
+  def socket_new(_num_node, _read_timeout, _write_timeout),
     do: error()
 
   @spec socket_start(integer, binary, pid, [pid]) ::

@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::str;
 use std::sync::{Arc, Barrier};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use rustler::env::OwnedEnv;
 use rustler::types::binary::{Binary, OwnedBinary};
@@ -12,7 +13,7 @@ use rustler::types::tuple::make_tuple;
 use rustler::types::{Encoder, LocalPid};
 use rustler::{Atom, Env, ListIterator, NifResult, ResourceArc};
 
-use crossbeam_channel::{bounded, select, unbounded, Sender, Receiver};
+use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 //use nix::sched::CpuSet;
 //use nix::sched::{sched_setaffinity, CpuSet};
 //use nix::unistd::gettid;
@@ -48,10 +49,12 @@ pub struct SocketCluster {
     s_receivers: Vec<Receiver<(SocketAddr, Vec<u8>)>>,
     barrier: Arc<Barrier>,
     state: ClusterState,
+    read_timeout: u64,
+    write_timeout: u64,
 }
 
 impl SocketCluster {
-    fn build_socket(addr: &str) -> Result<UdpSocket, Atom> {
+    fn build_socket(addr: &str, read_timeout: u64, write_timeout: u64) -> Result<UdpSocket, Atom> {
         let addr = addr
             .parse::<SocketAddr>()
             .map_err(|_| atoms::bad_format())?;
@@ -71,7 +74,10 @@ impl SocketCluster {
         sock.set_reuse_port(true)
             .map_err(|_| atoms::socket_error())?;
 
-        sock.set_nonblocking(true)
+        sock.set_read_timeout(Some(Duration::from_millis(read_timeout)))
+            .map_err(|_| atoms::socket_error())?;
+
+        sock.set_write_timeout(Some(Duration::from_millis(write_timeout)))
             .map_err(|_| atoms::socket_error())?;
 
         sock.bind(&addr.into()).map_err(|_| atoms::socket_error())?;
@@ -81,7 +87,7 @@ impl SocketCluster {
         Ok(std_sock)
     }
 
-    pub fn new(num_node: usize) -> Self {
+    pub fn new(num_node: usize, read_timeout: u64, write_timeout: u64) -> Self {
         let mut s_senders = Vec::with_capacity(num_node);
         let mut s_receivers = Vec::with_capacity(num_node);
         for _ in 0..num_node {
@@ -99,6 +105,8 @@ impl SocketCluster {
             s_receivers,
             barrier: Arc::new(Barrier::new(num_node * 2)),
             state: ClusterState::Idle,
+            read_timeout,
+            write_timeout,
         }
     }
 
@@ -125,7 +133,7 @@ impl SocketCluster {
         let mut sockets: Vec<Option<UdpSocket>> = Vec::with_capacity(num_node);
 
         for _n in 0..num_node {
-            let sock = Self::build_socket(&addr)?;
+            let sock = Self::build_socket(&addr, self.read_timeout, self.write_timeout)?;
             sockets.push(Some(sock));
         }
 
@@ -371,9 +379,9 @@ pub fn socket_sender_destroy(sender_ptr: i64) -> NifResult<Atom> {
 }
 
 #[rustler::nif]
-pub fn socket_new(num_node: i32) -> NifResult<(Atom, i64)> {
+pub fn socket_new(num_node: i32, read_timeout: u64, write_timeout: u64) -> NifResult<(Atom, i64)> {
     let num_node = num_node as usize;
-    let socket = SocketCluster::new(num_node);
+    let socket = SocketCluster::new(num_node, read_timeout, write_timeout);
 
     let socket_ptr = Box::into_raw(Box::new(socket));
     Ok((atoms::ok(), socket_ptr as i64))
