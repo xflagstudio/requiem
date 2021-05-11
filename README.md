@@ -16,11 +16,6 @@ This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche
 
 ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge between elixir and rust.
 
-Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
-(it also accepts **draft-27** or **draft-28** QUIC frames)
-
-- https://tools.ietf.org/html/draft-ietf-quic-transport-29
-
 ## Note
 
 This library is currently in an experimental phase.
@@ -35,7 +30,7 @@ by adding `requiem` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:requiem, "~> 0.3.0-rc.0"}
+    {:requiem, "~> 0.3.1-rc.0"}
   ]
 end
 ```
