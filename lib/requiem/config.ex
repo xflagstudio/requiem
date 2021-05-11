@@ -9,6 +9,8 @@ defmodule Requiem.Config do
           | :port
           | :dispatcher_pool_size
           | :socket_pool_size
+          | :socket_read_timeout
+          | :socket_write_timeout
           | :allow_address_routing
           | :token_secret
           | :connection_id_secret
@@ -42,6 +44,8 @@ defmodule Requiem.Config do
     port: 443,
     dispatcher_pool_size: 10,
     socket_pool_size: 0,
+    socket_read_timeout: 100,
+    socket_write_timeout: 100,
     allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
@@ -63,6 +67,8 @@ defmodule Requiem.Config do
     host: true,
     dispatcher_pool_size: true,
     socket_pool_size: true,
+    socket_read_timeout: true,
+    socket_write_timeout: true,
     allow_address_routing: true,
     token_secret: true,
     connection_id_secret: true,
