@@ -55,7 +55,10 @@ defmodule Requiem.Supervisor do
     Logger.debug("num_socket: #{num_socket}")
     dispatcher_pool_size = Config.get!(handler, :dispatcher_pool_size) * num_socket
 
-    case QUIC.Socket.new(num_socket) do
+    read_timeout = Config.get!(handler, :socket_read_timeout)
+    write_timeout = Config.get!(handler, :socket_write_timeout)
+
+    case QUIC.Socket.new(num_socket, read_timeout, write_timeout) do
       {:ok, socket_ptr} ->
         [
           {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},

@@ -6,10 +6,10 @@ defmodule Requiem.QUIC.Socket do
     NIF.cpu_num()
   end
 
-  @spec new(integer) ::
+  @spec new(integer, non_neg_integer, non_neg_integer) ::
           {:ok, integer} | {:error, :system_error | :socket_error}
-  def new(num_node) do
-    NIF.socket_new(num_node)
+  def new(num_node, read_timeout, write_timeout) do
+    NIF.socket_new(num_node, read_timeout, write_timeout)
   end
 
   @spec start(integer, binary, non_neg_integer, pid, [pid]) ::
