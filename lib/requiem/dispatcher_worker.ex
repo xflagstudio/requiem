@@ -99,7 +99,6 @@ defmodule Requiem.DispatcherWorker do
          is_version_supported},
         state
       ) do
-
     # this come from native receiver socket
     address = Address.from_rust_peer(peer)
     Tracer.trace(__MODULE__, state.trace_id, "@received: #{address}")
