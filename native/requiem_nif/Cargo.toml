@@ -1,6 +1,6 @@
 [package]
 name = "requiem_nif"
-version = "0.3.2"
+version = "0.3.3"
 authors = []
 edition = "2018"
 
@@ -8,6 +8,11 @@ edition = "2018"
 name = "requiem_nif"
 path = "src/lib.rs"
 crate-type = ["dylib"]
+
+[profile.release]
+opt-level = 's'
+lto = true
+codegen-units = 1
 
 [dependencies]
 rustler = "0.22.0-rc.0"
