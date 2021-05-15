@@ -30,7 +30,7 @@ by adding `requiem` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:requiem, "~> 0.3.2-rc.0"}
+    {:requiem, "~> 0.3.3-rc.0"}
   ]
 end
 ```
