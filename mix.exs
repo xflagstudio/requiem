@@ -42,7 +42,7 @@ defmodule Requiem.MixProject do
       {:toml, "~> 0.5"},
       {:hkdf, "~> 0.1.0"},
       {:fastglobal, "~> 1.0"},
-      {:rustler, "~> 0.22.0-rc.0"}
+      {:rustler, "~> 0.21"},
     ]
   end
 

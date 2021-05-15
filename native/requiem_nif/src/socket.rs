@@ -189,7 +189,7 @@ impl SocketCluster {
 
         let barrier = self.barrier.clone();
 
-        let oenv = OwnedEnv::new();
+        let mut oenv = OwnedEnv::new();
 
         let pid = caller_pid.clone();
 
@@ -199,52 +199,53 @@ impl SocketCluster {
         let target_pids = target_pids[target_pid_start..target_pid_end].to_vec();
 
         let handle = thread::spawn(move || {
-            oenv.run(move |env| {
+            //oenv.run(move |env| {
 
-                let mut buf = [0u8; 65535];
+            let mut buf = [0u8; 65535];
 
-                barrier.wait();
+            barrier.wait();
 
-                loop {
-                    select! {
-                        recv(closer_rx) -> _ => {
-                            break;
-                        },
-                        default => {
-                            match sock.recv_from(&mut buf) {
-                                Ok((len, peer)) => {
+            loop {
+                select! {
+                    recv(closer_rx) -> _ => {
+                        break;
+                    },
+                    default => {
+                        match sock.recv_from(&mut buf) {
+                            Ok((len, peer)) => {
 
-                                    if len < 4 {
-                                        continue;
-                                    }
+                                if len < 4 {
+                                    continue;
+                                }
 
-                                    if len > 1500 {
-                                        continue;
-                                    }
+                                if len > 1500 {
+                                    continue;
+                                }
 
-                                    match quiche::Header::from_slice(&mut buf[..len], quiche::MAX_CONN_ID_LEN) {
+                                match quiche::Header::from_slice(&mut buf[..len], quiche::MAX_CONN_ID_LEN) {
 
-                                        Ok(hdr) => {
-                                            let scid = packet::header_scid_binary(&hdr);
-                                            let dcid = packet::header_dcid_binary(&hdr);
-                                            let token = packet::header_token_binary(&hdr);
+                                    Ok(hdr) => {
+                                        let scid = packet::header_scid_binary(&hdr);
+                                        let dcid = packet::header_dcid_binary(&hdr);
+                                        let token = packet::header_token_binary(&hdr);
 
-                                            let version = hdr.version;
+                                        let version = hdr.version;
 
-                                            let typ = packet::packet_type(hdr.ty);
-                                            let is_version_supported = quiche::version_is_supported(hdr.version);
+                                        let typ = packet::packet_type(hdr.ty);
+                                        let is_version_supported = quiche::version_is_supported(hdr.version);
 
-                                            let mut body = OwnedBinary::new(len).unwrap();
-                                            body.as_mut_slice().copy_from_slice(&buf[..len]);
+                                        let mut body = OwnedBinary::new(len).unwrap();
+                                        body.as_mut_slice().copy_from_slice(&buf[..len]);
 
-                                            // TODO
-                                            // 下記のtarget_indexは、peerのアドレスの値のhashから算出するようにする
-                                            let mut hasher = DefaultHasher::new();
-                                            peer.hash(&mut hasher);
-                                            let idx = hasher.finish() % (target_pids.len() as u64);
+                                        // TODO
+                                        // 下記のtarget_indexは、peerのアドレスの値のhashから算出するようにする
+                                        let mut hasher = DefaultHasher::new();
+                                        peer.hash(&mut hasher);
+                                        let idx = hasher.finish() % (target_pids.len() as u64);
 
-                                            env.send(
-                                                &target_pids[idx as usize],
+                                        oenv.send_and_clear(
+                                            &target_pids[idx as usize],
+                                            |env| {
                                                 make_tuple(
                                                     env,
                                                     &[
@@ -258,35 +259,38 @@ impl SocketCluster {
                                                         typ.to_term(env),
                                                         is_version_supported.encode(env),
                                                     ],
-                                                ),
-                                            );
-                                        },
-                                        Err(_) => {
-                                            // this is not a QUIC packet, ignore.
-                                            continue;
-                                        }
+                                                )
+                                            }
+                                        );
+                                    },
+                                    Err(_) => {
+                                        // this is not a QUIC packet, ignore.
+                                        continue;
                                     }
-                                },
-                                Err(e) => {
-                                    match e.kind() {
-                                        std::io::ErrorKind::WouldBlock => {
-                                            continue;
-                                        },
-                                        _ => {
-                                            env.send(&pid, make_tuple(env, &[
+                                }
+                            },
+                            Err(e) => {
+                                match e.kind() {
+                                    std::io::ErrorKind::WouldBlock => {
+                                        continue;
+                                    },
+                                    _ => {
+                                        oenv.send_and_clear(&pid, |env| {
+                                            make_tuple(env, &[
                                                 atoms::socket_error().to_term(env),
                                                 atoms::cant_receive().to_term(env),
-                                            ]));
-                                            continue;
-                                        }
+                                            ])
+                                        });
+                                        continue;
                                     }
                                 }
                             }
-                        },
-                    }
+                        }
+                    },
                 }
+            }
 
-            });
+            //});
         });
 
         self.r_handles.push(Some(handle));
