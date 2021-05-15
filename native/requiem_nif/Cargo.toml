@@ -9,6 +9,11 @@ name = "requiem_nif"
 path = "src/lib.rs"
 crate-type = ["dylib"]
 
+[profile.release]
+opt-level = 's'
+lto = true
+codegen-units = 1
+
 [dependencies]
 rustler = "0.22.0-rc.0"
 socket2 = { version= "0.2", features = ["reuseport"] }
