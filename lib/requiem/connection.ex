@@ -687,6 +687,7 @@ defmodule Requiem.Connection do
         <<head::binary-size(4), _rest::binary>> -> Base.encode16(head)
         _ -> "----"
       end
+
     handler = Keyword.fetch!(opts, :handler)
 
     %__MODULE__{

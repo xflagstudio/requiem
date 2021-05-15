@@ -125,11 +125,11 @@ defmodule Requiem.Address do
 end
 
 defimpl String.Chars, for: Requiem.Address do
-  def to_string(%Requiem.Address{host: {n1, n2, n3, n4} = host, port: port}) do
+  def to_string(%Requiem.Address{host: {n1, n2, n3, n4}, port: port}) do
     "#{n1}.#{n2}.#{n3}.#{n4}:#{port}"
   end
-  def to_string(%Requiem.Address{host: {n1, n2, n3, n4, n5, n6, n7, n8} = host, port: port}) do
+
+  def to_string(%Requiem.Address{host: {n1, n2, n3, n4, n5, n6, n7, n8}, port: port}) do
     "#{n1}.#{n2}.#{n3}.#{n4}.#{n5}.#{n6}.#{n7}.#{n8}:#{port}"
   end
 end
-
