@@ -50,6 +50,30 @@ defmodule Requiem.RetryToken do
     end
   end
 
+  defmodule HKDF_SHA256 do
+    # most of this code in this module is borrowed from https://github.com/jschneider1207/hkdf.
+    # We need modify it because some crypto function is removed on OTP-24, and the project is not active.
+    def derive(ikm, len, salt \\ "", info \\ "") do
+      prk = extract(ikm, salt)
+      expand(prk, len, info)
+    end
+    def extract(ikm, salt \\ "") do
+      :crypto.mac(:hmac, :sha256, salt, ikm)
+    end
+    def expand(prk, len, info \\ "") do
+      hash_len = 32
+      n = Float.ceil(len/hash_len) |> round()
+          full =
+      Enum.scan(1..n, "", fn index, prev ->
+      data = prev <> info <> <<index>>
+      :crypto.mac(:hmac, :sha256, prk, data)
+      end)
+      |> Enum.reduce("", &Kernel.<>(&2, &1))
+      <<output :: unit(8)-size(len), _ :: binary>> = full
+      <<output :: unit(8)-size(len)>>
+    end
+  end
+
   defmodule Protector do
     @aad "AES128GCM"
     @info "Requiem QUIC Token"
@@ -58,7 +82,7 @@ defmodule Requiem.RetryToken do
     def encrypt(secret, nonce, token) do
       case derive_key_and_iv(secret, nonce) do
         {:ok, key, iv} ->
-          case :crypto.block_encrypt(:aes_gcm, key, iv, {@aad, token, 16}) do
+          case :crypto.crypto_one_time_aead(:aes_gcm, key, iv, token, @aad, 16, true) do
             {ciphertext, tag} -> {:ok, ciphertext, tag}
             _ -> :error
           end
@@ -72,7 +96,7 @@ defmodule Requiem.RetryToken do
     def decrypt(secret, nonce, tag, token) do
       case derive_key_and_iv(secret, nonce) do
         {:ok, key, iv} ->
-          case :crypto.block_decrypt(:aes_gcm, key, iv, {@aad, token, tag}) do
+          case :crypto.crypto_one_time_aead(:aes_gcm, key, iv, token, @aad, tag, false) do
             result when is_binary(result) -> {:ok, result}
             _ -> :error
           end
@@ -84,7 +108,7 @@ defmodule Requiem.RetryToken do
 
     @spec derive_key_and_iv(binary, binary) :: {:ok, binary, binary} | :error
     def derive_key_and_iv(secret, nonce) do
-      case HKDF.derive(:sha256, secret, 44, nonce, @info) do
+      case HKDF_SHA256.derive(secret, 44, nonce, @info) do
         <<key::binary-size(32), iv::binary-size(12)>> -> {:ok, key, iv}
         _ -> :error
       end

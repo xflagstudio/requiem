@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.3.3-rc.0",
+      version: "0.3.4-rc.0",
       elixir: "~> 1.11",
       package: package(),
       compilers: [:rustler] ++ Mix.compilers(),
@@ -40,7 +40,6 @@ defmodule Requiem.MixProject do
       {:ex_doc, "~> 0.23", only: [:dev], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:toml, "~> 0.5"},
-      {:hkdf, "~> 0.1.0"},
       {:fastglobal, "~> 1.0"},
       {:rustler, "~> 0.22.0-rc.0"},
     ]
