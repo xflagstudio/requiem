@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.3.3-rc.0",
+      version: "0.3.4-rc.0",
       elixir: "~> 1.11",
       package: package(),
       compilers: [:rustler] ++ Mix.compilers(),
