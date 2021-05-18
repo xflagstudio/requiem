@@ -32,11 +32,11 @@ defmodule RequiemEcho.Handler do
     Logger.debug("<Handler> handle_stream(#{stream_id}, #{data})")
 
     if Requiem.StreamId.is_bidi?(stream_id) do
-      stream_send(stream_id, data)
+      stream_send(stream_id, data, false)
       {:ok, conn, state}
     else
       {stream_id, conn2} = Requiem.ConnectionState.create_new_stream_id(conn, :uni)
-      stream_send(stream_id, data)
+      stream_send(stream_id, data, false)
       {:ok, conn2, state}
     end
   end
