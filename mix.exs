@@ -41,7 +41,7 @@ defmodule Requiem.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:toml, "~> 0.5"},
       {:fastglobal, "~> 1.0"},
-      {:rustler, "~> 0.22.0-rc.0"},
+      {:rustler, "~> 0.22.0-rc.0"}
     ]
   end
 
