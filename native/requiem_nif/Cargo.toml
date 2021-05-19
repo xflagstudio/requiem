@@ -15,7 +15,8 @@ lto = true
 codegen-units = 1
 
 [dependencies]
-rustler = "0.22.0-rc.0"
+#rustler = "0.22.0-rc.0"
+rustler = { git = "https://github.com/filmor/rustler", branch = "otp24", path = "rustler" }
 socket2 = { version= "0.2", features = ["reuseport"] }
 num_cpus = "1.0"
 quiche = "0.8"
