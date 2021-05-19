@@ -42,7 +42,6 @@ defmodule Requiem.MixProject do
       {:toml, "~> 0.5"},
       {:fastglobal, "~> 1.0"},
       {:rustler, "~> 0.22.0-rc.0"}
-      #{:rustler, github: "filmor/rustler", commit: "f5b34efd8c5dda44d9175746f887da0d82605838"}
     ]
   end
 

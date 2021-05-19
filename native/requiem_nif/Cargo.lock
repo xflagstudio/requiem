@@ -202,7 +202,7 @@ dependencies = [
 [[package]]
 name = "rustler"
 version = "0.22.0-rc.0"
-source = "git+https://github.com/filmor/rustler?branch=otp24#f5b34efd8c5dda44d9175746f887da0d82605838"
+source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
 dependencies = [
  "lazy_static",
  "rustler_codegen",
@@ -212,7 +212,7 @@ dependencies = [
 [[package]]
 name = "rustler_codegen"
 version = "0.22.0-rc.0"
-source = "git+https://github.com/filmor/rustler?branch=otp24#f5b34efd8c5dda44d9175746f887da0d82605838"
+source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -223,7 +223,7 @@ dependencies = [
 [[package]]
 name = "rustler_sys"
 version = "2.1.0"
-source = "git+https://github.com/filmor/rustler?branch=otp24#f5b34efd8c5dda44d9175746f887da0d82605838"
+source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
 dependencies = [
  "unreachable",
 ]
