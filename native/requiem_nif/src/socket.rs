@@ -23,7 +23,7 @@ use crate::common::{self, atoms};
 use crate::packet;
 
 pub struct Peer {
-    addr: SocketAddr,
+    pub addr: SocketAddr,
 }
 
 impl Peer {

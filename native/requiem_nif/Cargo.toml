@@ -19,5 +19,5 @@ codegen-units = 1
 rustler = { git = "https://github.com/rusterlium/rustler", commit = "4786f233a971058d0f677e0686bdf465dd458f01" }
 socket2 = { version= "0.2", features = ["reuseport"] }
 num_cpus = "1.0"
-quiche = "0.8"
+quiche = "0.9.0"
 crossbeam-channel = "0.5"
