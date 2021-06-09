@@ -151,9 +151,9 @@ dependencies = [
 
 [[package]]
 name = "quiche"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a74ef6bcd0be1b5b810c51dd84a1f27c68c3211be45b07169ac6a4de995aa20"
+checksum = "9aaba1ba80a42d3da61d90133cedd00e8dfd4a6fe1d01128956de95dc2aaa4e2"
 dependencies = [
  "cmake",
  "lazy_static",
