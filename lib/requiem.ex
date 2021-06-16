@@ -136,7 +136,7 @@ defmodule Requiem do
 
     @impl Requiem
     def handle_stream(stream_id, data, conn, state) do
-      stream_send(stream_id, data)
+      stream_send(stream_id, data, false)
       {:ok, conn, state}
     end
 
@@ -160,7 +160,7 @@ defmodule Requiem do
 
     @impl Requiem
     def handle_stream(stream_id, data, conn, state) do
-      stream_send(stream_id, data)
+      stream_send(stream_id, data, false)
       {:ok, conn, state}
     end
 
@@ -205,7 +205,7 @@ defmodule Requiem do
 
     @impl Requiem
     def handle_stream(stream_id, data, conn, state) do
-      stream_send(stream_id, data)
+      stream_send(stream_id, data, false)
       {:ok, conn, state}
     end
 
