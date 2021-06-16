@@ -57,20 +57,24 @@ defmodule Requiem.RetryToken do
       prk = extract(ikm, salt)
       expand(prk, len, info)
     end
+
     def extract(ikm, salt \\ "") do
       :crypto.mac(:hmac, :sha256, salt, ikm)
     end
+
     def expand(prk, len, info \\ "") do
       hash_len = 32
-      n = Float.ceil(len/hash_len) |> round()
-          full =
-      Enum.scan(1..n, "", fn index, prev ->
-      data = prev <> info <> <<index>>
-      :crypto.mac(:hmac, :sha256, prk, data)
-      end)
-      |> Enum.reduce("", &Kernel.<>(&2, &1))
-      <<output :: unit(8)-size(len), _ :: binary>> = full
-      <<output :: unit(8)-size(len)>>
+      n = Float.ceil(len / hash_len) |> round()
+
+      full =
+        Enum.scan(1..n, "", fn index, prev ->
+          data = prev <> info <> <<index>>
+          :crypto.mac(:hmac, :sha256, prk, data)
+        end)
+        |> Enum.reduce("", &Kernel.<>(&2, &1))
+
+      <<output::unit(8)-size(len), _::binary>> = full
+      <<output::unit(8)-size(len)>>
     end
   end
 

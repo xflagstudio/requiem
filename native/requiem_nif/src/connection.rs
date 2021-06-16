@@ -53,7 +53,10 @@ impl Connection {
         packet: &mut [u8],
     ) -> Result<u64, Atom> {
         if !self.raw.is_closed() {
-            match self.raw.recv(packet) {
+            let info = quiche::RecvInfo {
+                from: self.peer.addr,
+            };
+            match self.raw.recv(packet, info) {
                 Ok(_len) => {
                     self.handle_stream(env, pid);
                     self.handle_dgram(env, pid);
@@ -192,7 +195,7 @@ impl Connection {
     fn drain(&mut self, env: &Env) {
         loop {
             match self.raw.send(&mut self.dgram_buf) {
-                Ok(len) => {
+                Ok((len, _send_info)) => {
                     let mut packet = OwnedBinary::new(len).unwrap();
                     packet
                         .as_mut_slice()
@@ -251,7 +254,7 @@ pub fn connection_accept(
     let scid = quiche::ConnectionId::from_ref(scid);
     let odcid = quiche::ConnectionId::from_ref(odcid);
 
-    match quiche::accept(&scid, Some(&odcid), conf) {
+    match quiche::accept(&scid, Some(&odcid), peer.addr, conf) {
         Ok(raw_conn) => {
             let conn = Connection::new(raw_conn, peer, sender_pid, stream_buf_size as usize);
             Ok((atoms::ok(), Box::into_raw(Box::new(conn)) as i64))
