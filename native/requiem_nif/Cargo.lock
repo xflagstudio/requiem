@@ -175,7 +175,7 @@ dependencies = [
 
 [[package]]
 name = "requiem_nif"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "crossbeam-channel",
  "num_cpus",
@@ -201,8 +201,9 @@ dependencies = [
 
 [[package]]
 name = "rustler"
-version = "0.22.0-rc.0"
-source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b787d3b2a80007f41cd4c0c310cdeb3936192768159585f65ecc7e96faf97fc3"
 dependencies = [
  "lazy_static",
  "rustler_codegen",
@@ -211,8 +212,9 @@ dependencies = [
 
 [[package]]
 name = "rustler_codegen"
-version = "0.22.0-rc.0"
-source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5a1f867002b6f0130f47abf215cac4405646db6f5d7b009b21c890980490aa4"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -222,8 +224,9 @@ dependencies = [
 
 [[package]]
 name = "rustler_sys"
-version = "2.1.0"
-source = "git+https://github.com/rusterlium/rustler#4786f233a971058d0f677e0686bdf465dd458f01"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cb382fde4f421c51555919e9920b058c0286f6bf59e53d02eb4d281eae6758b"
 dependencies = [
  "unreachable",
 ]

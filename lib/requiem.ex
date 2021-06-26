@@ -13,9 +13,6 @@ defmodule Requiem do
 
   ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge between elixir and rust.
 
-  Current **quiche** version is **0.6.0**, and it supports **draft-29** of quic-transport-protocol.
-  (it also accepts **draft-27** or **draft-28** QUIC frames)
-
   ## Note
 
   This library is currently in an experimental phase.
