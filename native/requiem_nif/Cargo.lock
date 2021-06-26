@@ -175,7 +175,7 @@ dependencies = [
 
 [[package]]
 name = "requiem_nif"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "crossbeam-channel",
  "num_cpus",
