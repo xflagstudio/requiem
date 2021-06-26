@@ -146,9 +146,7 @@ defmodule Requiem.Connection do
 
           other ->
             Logger.error(
-              "<Requiem.Connection:#{self()}> handle_call returned unknown pattern: #{
-                inspect(other)
-              }"
+              "<Requiem.Connection:#{self()}> handle_call returned unknown pattern: #{inspect(other)}"
             )
 
             close(false, :internal_error, :server_error)
@@ -220,9 +218,7 @@ defmodule Requiem.Connection do
 
           other ->
             Logger.error(
-              "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{
-                inspect(other)
-              }"
+              "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{inspect(other)}"
             )
 
             close(false, :internal_error, :server_error)
@@ -332,9 +328,7 @@ defmodule Requiem.Connection do
 
           other ->
             Logger.error(
-              "<Requiem.Connection:#{self()}> handle_stream returned unknown pattern: #{
-                inspect(other)
-              }"
+              "<Requiem.Connection:#{self()}> handle_stream returned unknown pattern: #{inspect(other)}"
             )
 
             close(false, :internal_error, :server_error)
@@ -378,9 +372,7 @@ defmodule Requiem.Connection do
 
           other ->
             Logger.error(
-              "<Requiem.Connection:#{self()}> handle_dgram returned unknown pattern: #{
-                inspect(other)
-              }"
+              "<Requiem.Connection:#{self()}> handle_dgram returned unknown pattern: #{inspect(other)}"
             )
 
             close(false, :internal_error, :server_error)
@@ -598,9 +590,7 @@ defmodule Requiem.Connection do
 
           other ->
             Logger.error(
-              "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{
-                inspect(other)
-              }"
+              "<Requiem.Connection:#{self()}> handle_cast returned unknown pattern: #{inspect(other)}"
             )
 
             close(false, :internal_error, :server_error)

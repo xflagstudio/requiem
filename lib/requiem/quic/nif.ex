@@ -1,5 +1,8 @@
 defmodule Requiem.QUIC.NIF do
-  use Rustler, otp_app: :requiem, crate: "requiem_nif"
+  use Rustler,
+    otp_app: :requiem,
+    crate: "requiem_nif",
+    mode: :release
 
   @spec config_new() ::
           {:ok, integer} | {:error, :system_error | :not_found}
