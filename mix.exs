@@ -7,9 +7,7 @@ defmodule Requiem.MixProject do
       version: "0.3.5-rc.0",
       elixir: "~> 1.11",
       package: package(),
-      compilers: [:rustler] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
-      rustler_crates: rustler_crates(),
       deps: deps()
     ]
   end
@@ -18,15 +16,6 @@ defmodule Requiem.MixProject do
   def application do
     [
       extra_applications: [:logger, :eex, :crypto]
-    ]
-  end
-
-  defp rustler_crates do
-    [
-      requiem_nif: [
-        path: "native/requiem_nif",
-        mode: rustc_mode(Mix.env())
-      ]
     ]
   end
 
@@ -41,7 +30,7 @@ defmodule Requiem.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:toml, "~> 0.5"},
       {:fastglobal, "~> 1.0"},
-      {:rustler, "~> 0.22.0-rc.0"}
+      {:rustler, "~> 0.22"}
     ]
   end
 
