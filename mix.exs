@@ -33,7 +33,7 @@ defmodule Requiem.MixProject do
   defp package() do
     [
       description: "A QuicTransport server framework.",
-      files: ["lib", "mix.exs", "README*", "readme*", "LICENSE*", "license*", "CHANGELOG*", "changelog*", "src"],
+      files: ["lib", "mix.exs", "README*", "LICENSE*", "native", "test"],
       licenses: ["MIT"],
       links: %{
         "Github" => "https://github.com/xflagstudio/requiem",
