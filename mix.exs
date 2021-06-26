@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.3.6",
+      version: "0.3.7",
       elixir: "~> 1.11",
       package: package(),
       start_permanent: Mix.env() == :prod,
@@ -18,10 +18,6 @@ defmodule Requiem.MixProject do
       extra_applications: [:logger, :eex, :crypto]
     ]
   end
-
-  defp rustc_mode(_), do: :release
-  # defp rustc_mode(:prod), do: :release
-  # defp rustc_mode(_), do: :debug
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
@@ -37,6 +33,7 @@ defmodule Requiem.MixProject do
   defp package() do
     [
       description: "A QuicTransport server framework.",
+      files: ["lib", "mix.exs", "README*", "readme*", "LICENSE*", "license*", "CHANGELOG*", "changelog*", "src"],
       licenses: ["MIT"],
       links: %{
         "Github" => "https://github.com/xflagstudio/requiem",

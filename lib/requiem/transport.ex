@@ -47,9 +47,7 @@ defmodule Requiem.Transport do
 
       {:error, :socket_error} ->
         Logger.error(
-          "<Requiem.Transport> failed to bind UDP port, make sure that the values for this host(#{
-            host
-          }) and port(#{port}) are correct and that the port(#{port}) is not already in use."
+          "<Requiem.Transport> failed to bind UDP port, make sure that the values for this host(#{host}) and port(#{port}) are correct and that the port(#{port}) is not already in use."
         )
 
         {:stop, :normal}
