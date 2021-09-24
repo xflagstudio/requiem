@@ -1,7 +1,7 @@
 # ReQUIem
 
-[![hex.pm version](https://img.shields.io/hexpm/v/requiem.svg)](https://hex.pm/packages/requiem)
-[![hex.pm](https://img.shields.io/hexpm/l/requiem.svg)](https://github.com/xflagstudio/requiem/blob/master/LICENSE)
+[![hex.pm version](https://img.shields.io/hexpm/v/requiem)](https://hex.pm/packages/requiem)
+[![hex.pm](https://img.shields.io/hexpm/l/requiem)](https://github.com/xflagstudio/requiem/blob/master/LICENSE)
 
 ## Description
 
@@ -30,7 +30,7 @@ by adding `requiem` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:requiem, "~> 0.3.7"}
+    {:requiem, "~> 0.3.8"}
   ]
 end
 ```

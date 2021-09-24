@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.3.7",
+      version: "0.3.8",
       elixir: "~> 1.11",
       package: package(),
       start_permanent: Mix.env() == :prod,
@@ -33,7 +33,7 @@ defmodule Requiem.MixProject do
   defp package() do
     [
       description: "A QuicTransport server framework.",
-      files: ["lib", "mix.exs", "README*", "readme*", "LICENSE*", "license*", "CHANGELOG*", "changelog*", "src"],
+      files: ["lib", "mix.exs", "README*", "LICENSE*", "native", "test"],
       licenses: ["MIT"],
       links: %{
         "Github" => "https://github.com/xflagstudio/requiem",
