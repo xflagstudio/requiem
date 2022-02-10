@@ -1,6 +1,6 @@
 [package]
 name = "requiem_nif"
-version = "0.3.8"
+version = "0.3.9"
 authors = []
 edition = "2021"
 
