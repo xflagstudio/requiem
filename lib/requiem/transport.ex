@@ -4,7 +4,7 @@ defmodule Requiem.Transport do
   # require Requiem.Tracer
 
   alias Requiem.DispatcherRegistry
-  alias Requiem.QUIC
+  alias Requiem.NIF
   # alias Requiem.Tracer
 
   @type t :: %__MODULE__{
@@ -33,7 +33,7 @@ defmodule Requiem.Transport do
     host = Keyword.fetch!(opts, :host)
     port = Keyword.fetch!(opts, :port)
 
-    case QUIC.Socket.start(
+    case NIF.Socket.start(
            state.socket_ptr,
            host,
            port,
@@ -68,7 +68,7 @@ defmodule Requiem.Transport do
   @impl GenServer
   def terminate(reason, state) do
     Logger.info("<Requiem.Transport> @terminate: #{inspect(reason)}")
-    QUIC.Socket.destroy(state.socket_ptr)
+    NIF.Socket.destroy(state.socket_ptr)
     :ok
   end
 

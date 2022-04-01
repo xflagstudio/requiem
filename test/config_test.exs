@@ -1,7 +1,7 @@
 defmodule RequiemTest.ConfigTest do
   use ExUnit.Case, async: true
 
-  alias Requiem.QUIC.Config
+  alias Requiem.NIF.Config
 
   test "call initialized config" do
     {:ok, c} = Config.new()
@@ -43,10 +43,10 @@ defmodule RequiemTest.ConfigTest do
   end
 
   test "ALPN param" do
-    assert Requiem.QUIC.Config.ALPN.encode("http/1.1") ==
+    assert Requiem.NIF.Config.ALPN.encode("http/1.1") ==
              <<0x08, 0x68, 0x74, 0x74, 0x70, 0x2F, 0x31, 0x2E, 0x31>>
 
-    assert Requiem.QUIC.Config.ALPN.encode_list(["http/1.0", "http/1.1"]) ==
+    assert Requiem.NIF.Config.ALPN.encode_list(["http/1.0", "http/1.1"]) ==
              <<0x08, 0x68, 0x74, 0x74, 0x70, 0x2F, 0x31, 0x2E, 0x30, 0x08, 0x68, 0x74, 0x74, 0x70,
                0x2F, 0x31, 0x2E, 0x31>>
   end

@@ -5,7 +5,7 @@ defmodule Requiem.SenderWorker do
 
   alias Requiem.Address
   alias Requiem.SenderRegistry
-  alias Requiem.QUIC
+  alias Requiem.NIF
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
@@ -59,7 +59,7 @@ defmodule Requiem.SenderWorker do
          ) do
       {:ok, _pid} ->
         {:ok, sender_ptr} =
-          QUIC.SocketSender.get(
+          NIF.SocketSender.get(
             state.socket_ptr,
             state.worker_index
           )
@@ -74,14 +74,14 @@ defmodule Requiem.SenderWorker do
   @impl GenServer
   def handle_cast({:send, address, packet}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@send")
-    QUIC.SocketSender.send(state.sender_ptr, address.raw, packet)
+    NIF.SocketSender.send(state.sender_ptr, address.raw, packet)
     {:noreply, state}
   end
 
   @impl GenServer
   def handle_info({:__drain__, address, packet}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@drain")
-    QUIC.SocketSender.send(state.sender_ptr, address, packet)
+    NIF.SocketSender.send(state.sender_ptr, address, packet)
     {:noreply, state}
   end
 
@@ -89,7 +89,7 @@ defmodule Requiem.SenderWorker do
   def terminate(_reason, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@terminate")
     SenderRegistry.unregister(state.handler, state.worker_index)
-    QUIC.SocketSender.destroy(state.sender_ptr)
+    NIF.SocketSender.destroy(state.sender_ptr)
     :ok
   end
 

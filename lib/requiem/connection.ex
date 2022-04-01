@@ -11,7 +11,7 @@ defmodule Requiem.Connection do
   alias Requiem.ErrorCode
   alias Requiem.ConnectionRegistry
   alias Requiem.ConnectionState
-  alias Requiem.QUIC
+  alias Requiem.NIF
   alias Requiem.Tracer
 
   @type t :: %__MODULE__{
@@ -56,7 +56,7 @@ defmodule Requiem.Connection do
     config_ptr = Keyword.fetch!(opts, :config_ptr)
     sender_pid = Keyword.fetch!(opts, :sender_pid)
 
-    case QUIC.Connection.accept(
+    case NIF.Connection.accept(
            config_ptr,
            state.conn_state.dcid,
            state.conn_state.odcid,
@@ -87,7 +87,7 @@ defmodule Requiem.Connection do
 
           {:error, {:already_registered, _pid}} ->
             Tracer.trace(__MODULE__, state.trace_id, "@init: failed registered")
-            QUIC.Connection.destroy(conn)
+            NIF.Connection.destroy(conn)
             {:stop, :normal}
         end
 
@@ -162,7 +162,7 @@ defmodule Requiem.Connection do
   def handle_cast({:__packet__, _address, packet}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@packet")
 
-    case QUIC.Connection.on_packet(state.conn, packet) do
+    case NIF.Connection.on_packet(state.conn, packet) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -249,7 +249,7 @@ defmodule Requiem.Connection do
           {:ok, %ConnectionState{} = conn_state, handler_state} ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed")
 
-            case QUIC.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn, request.session_id) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
                 {:noreply,
@@ -278,7 +278,7 @@ defmodule Requiem.Connection do
           when is_integer(timeout) ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed with timeout")
 
-            case QUIC.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn, request.session_id) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
                 {:noreply,
@@ -306,7 +306,7 @@ defmodule Requiem.Connection do
           {:ok, %ConnectionState{} = conn_state, handler_state, :hibernate} ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed with :hibernate")
 
-            case QUIC.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn, request.session_id) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
                 {:noreply,
@@ -335,7 +335,7 @@ defmodule Requiem.Connection do
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: stop")
             # TODO assert code >= 400 && code < 600
             # TODO pass reason
-            case QUIC.Connection.reject_connect_request(conn, request.session_id, code) do
+            case NIF.Connection.reject_connect_request(conn, request.session_id, code) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
                 {:noreply, state}
@@ -369,7 +369,7 @@ defmodule Requiem.Connection do
         {:__connect__, session_id, _authority, _path, _origin},
         %{handler_initialized: true} = state
       ) do
-    case QUIC.Connection.reject_connect_request(state.conn, session_id, 419) do
+    case NIF.Connection.reject_connect_request(state.conn, session_id, 419) do
       :ok ->
         {:noreply, state}
 
@@ -413,7 +413,7 @@ defmodule Requiem.Connection do
   def handle_info(:__timeout__, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@timeout")
 
-    case QUIC.Connection.on_timeout(state.conn) do
+    case NIF.Connection.on_timeout(state.conn) do
       {:ok, next_timeout} ->
         Tracer.trace(__MODULE__, state.trace_id, "@timeout: done, next_timeout: #{next_timeout}")
         state = reset_conn_timer(state, next_timeout)
@@ -526,7 +526,7 @@ defmodule Requiem.Connection do
     Tracer.trace(__MODULE__, state.trace_id, "@close")
 
     # TODO set proper error code
-    case QUIC.Connection.close(state.conn, app, 0x1, to_string(reason)) do
+    case NIF.Connection.close(state.conn, app, 0x1, to_string(reason)) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -556,7 +556,7 @@ defmodule Requiem.Connection do
 
   def handle_info({:__stream_open__, is_bidi, message}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@stream_open")
-    case QUIC.Connection.open_stream(state.conn, is_bidi) do
+    case NIF.Connection.open_stream(state.conn, is_bidi) do
       {:ok, stream_id, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -582,7 +582,7 @@ defmodule Requiem.Connection do
   def handle_info({:__stream_send__, stream_id, data, fin}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@stream_send")
 
-    case QUIC.Connection.stream_send(state.conn, stream_id, data, fin) do
+    case NIF.Connection.stream_send(state.conn, stream_id, data, fin) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -608,7 +608,7 @@ defmodule Requiem.Connection do
   def handle_info({:__dgram_send__, data}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@dgram_send")
 
-    case QUIC.Connection.dgram_send(state.conn, data) do
+    case NIF.Connection.dgram_send(state.conn, data) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -703,7 +703,7 @@ defmodule Requiem.Connection do
     Tracer.trace(__MODULE__, state.trace_id, "@terminate #{inspect(reason)}")
 
     state = cancel_conn_timer(state)
-    QUIC.Connection.destroy(state.conn)
+    NIF.Connection.destroy(state.conn)
     state = %{state | conn: nil}
 
     ConnectionRegistry.unregister(

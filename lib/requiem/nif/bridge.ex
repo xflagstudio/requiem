@@ -1,4 +1,4 @@
-defmodule Requiem.QUIC.NIF do
+defmodule Requiem.NIF.Bridge do
   use Rustler,
     otp_app: :requiem,
     crate: "requiem_nif",

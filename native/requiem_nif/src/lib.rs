@@ -12,7 +12,7 @@ mod packet;
 mod socket;
 
 rustler::init!(
-    "Elixir.Requiem.QUIC.NIF",
+    "Elixir.Requiem.NIF.Bridge",
     [
         config::config_new,
         config::config_destroy,

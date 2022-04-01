@@ -10,7 +10,7 @@ defmodule Requiem.DispatcherWorker do
   alias Requiem.DispatcherRegistry
   alias Requiem.SenderRegistry
   alias Requiem.SenderWorker
-  alias Requiem.QUIC
+  alias Requiem.NIF
   alias Requiem.RetryToken
   alias Requiem.Tracer
 
@@ -67,13 +67,13 @@ defmodule Requiem.DispatcherWorker do
     {:ok, sender_pid} = SenderRegistry.lookup(state.handler, sender_idx)
     state = %{state | sender_pid: sender_pid}
 
-    {:ok, config} = QUIC.Config.new()
+    {:ok, config} = NIF.Config.new()
 
     try do
-      QUIC.init_config(state.handler, config)
+      NIF.init_config(state.handler, config)
     rescue
       err ->
-        QUIC.Config.destroy(config)
+        NIF.Config.destroy(config)
         raise err
     end
 
@@ -84,11 +84,11 @@ defmodule Requiem.DispatcherWorker do
            state.worker_index
          ) do
       {:ok, _pid} ->
-        {:ok, builder} = QUIC.PacketBuilder.new()
+        {:ok, builder} = NIF.PacketBuilder.new()
         {:ok, %{state | packet_builder: builder, config_ptr: config}}
 
       {:error, {:already_registered, _pid}} ->
-        QUIC.Config.destroy(config)
+        NIF.Config.destroy(config)
         {:stop, :normal}
     end
   end
@@ -121,8 +121,8 @@ defmodule Requiem.DispatcherWorker do
   @impl GenServer
   def terminate(_reason, state) do
     DispatcherRegistry.unregister(state.handler, state.worker_index)
-    QUIC.Config.destroy(state.config_ptr)
-    QUIC.PacketBuilder.destroy(state.packet_builder)
+    NIF.Config.destroy(state.config_ptr)
+    NIF.PacketBuilder.destroy(state.packet_builder)
     :ok
   end
 
@@ -194,7 +194,7 @@ defmodule Requiem.DispatcherWorker do
   end
 
   defp handle_version_unsupported_packet(address, scid, dcid, state) do
-    case QUIC.PacketBuilder.build_negotiate_version(state.packet_builder, scid, dcid) do
+    case NIF.PacketBuilder.build_negotiate_version(state.packet_builder, scid, dcid) do
       {:ok, resp} ->
         send(address, resp, state)
         :ok
@@ -210,7 +210,7 @@ defmodule Requiem.DispatcherWorker do
          {:ok, token} <-
            RetryToken.create(address, dcid, new_id, state.token_secret),
          {:ok, resp} <-
-           QUIC.PacketBuilder.build_retry(
+           NIF.PacketBuilder.build_retry(
              state.packet_builder,
              scid,
              dcid,
