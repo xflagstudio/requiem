@@ -1,5 +1,10 @@
 use rustler::{Env, Term};
 
+#[macro_use]
+extern crate log;
+
+use simplelog::{Config, SimpleLogger};
+
 mod common;
 mod config;
 mod connection;
@@ -39,6 +44,9 @@ rustler::init!(
         packet::packet_builder_build_retry,
         connection::connection_accept,
         connection::connection_destroy,
+        connection::connection_open_stream,
+        connection::connection_accept_connect_request,
+        connection::connection_reject_connect_request,
         connection::connection_close,
         connection::connection_is_closed,
         connection::connection_on_packet,
@@ -59,6 +67,7 @@ rustler::init!(
 );
 
 fn load(env: Env, _: Term) -> bool {
+    SimpleLogger::init(log::LevelFilter::Debug, Config::default()).unwrap();
     socket::on_load(env);
     true
 }

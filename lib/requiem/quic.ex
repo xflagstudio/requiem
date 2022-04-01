@@ -1,12 +1,10 @@
 defmodule Requiem.QUIC do
   alias Requiem.Config
 
-  @web_transport_alpn "wq-vvv-01"
+  @http3_alpn "h3"
 
   @spec init_config(module, integer) :: no_return
   def init_config(handler, ptr) do
-    is_web_transport = Config.get(handler, :web_transport)
-
     cert_chain = Config.get(handler, :cert_chain)
 
     if cert_chain != nil do
@@ -74,17 +72,7 @@ defmodule Requiem.QUIC do
       end
     end
 
-    if is_web_transport do
-      Requiem.QUIC.Config.set_application_protos(ptr, [@web_transport_alpn])
-    else
-      application_protos = Config.get(handler, :application_protos)
-
-      if application_protos != nil do
-        if Requiem.QUIC.Config.set_application_protos(ptr, application_protos) != :ok do
-          raise "<Requiem.QUIC> Requiem.QUIC.application_protos failed"
-        end
-      end
-    end
+    Requiem.QUIC.Config.set_application_protos(ptr, [@http3_alpn])
 
     # default is inifinite
     max_idle_timeout = Config.get(handler, :max_idle_timeout)
@@ -167,10 +155,8 @@ defmodule Requiem.QUIC do
       end
     end
 
-    if is_web_transport do
-      if initial_max_streams_uni == nil || initial_max_streams_uni < 1 do
-        raise "<Requiem.QUIC> on WebTransport mode, 'initial_max_streams_uni' must be greater than 0"
-      end
+    if initial_max_streams_uni == nil || initial_max_streams_uni < 1 do
+      raise "<Requiem.QUIC> 'initial_max_streams_uni' must be greater than 0"
     end
 
     # default is 3
@@ -219,15 +205,10 @@ defmodule Requiem.QUIC do
       end
     end
 
-    # default is false
-    enable_dgram = Config.get(handler, :enable_dgram)
+    queue_size = Config.get(handler, :dgram_queue_size)
 
-    if enable_dgram != nil do
-      queue_size = Config.get(handler, :dgram_queue_size)
-
-      if Requiem.QUIC.Config.enable_dgram(ptr, enable_dgram, queue_size, queue_size) != :ok do
-        raise "<Requiem.QUIC> Requiem.QUIC.enable_dgram failed"
-      end
+    if Requiem.QUIC.Config.enable_dgram(ptr, true, queue_size, queue_size) != :ok do
+      raise "<Requiem.QUIC> Requiem.QUIC.enable_dgram failed"
     end
   end
 end

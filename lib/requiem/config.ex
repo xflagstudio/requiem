@@ -4,7 +4,7 @@ defmodule Requiem.Config do
   """
 
   @type config_key ::
-          :web_transport
+          :server_name
           | :host
           | :port
           | :dispatcher_pool_size
@@ -36,10 +36,9 @@ defmodule Requiem.Config do
           | :disable_active_migration
           | :cc_algorithm_name
           | :enable_hystart
-          | :enable_dgram
 
   @default_values [
-    web_transport: false,
+    server_name: "ReQUIem",
     host: "0.0.0.0",
     port: 443,
     dispatcher_pool_size: 10,
@@ -62,7 +61,7 @@ defmodule Requiem.Config do
   ]
 
   @key_table %{
-    web_transport: true,
+    server_name: true,
     port: true,
     host: true,
     dispatcher_pool_size: true,
@@ -93,8 +92,7 @@ defmodule Requiem.Config do
     max_ack_delay: true,
     disable_active_migration: true,
     cc_algorithm_name: true,
-    enable_hystart: true,
-    enable_dgram: true
+    enable_hystart: true
   }
 
   @spec get!(module, config_key) :: term

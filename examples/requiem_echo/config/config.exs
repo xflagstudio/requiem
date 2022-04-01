@@ -14,8 +14,6 @@ config :requiem_echo, RequiemEcho.Handler,
   initial_max_streams_uni: 10,
   initial_max_streams_bidi: 10,
   disable_active_migration: true,
-  web_transport: true,
-  enable_early_data: true,
-  enable_dgram: true
+  enable_early_data: true
 
 config :requiem, trace: true

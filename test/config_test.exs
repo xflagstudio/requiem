@@ -50,14 +50,4 @@ defmodule RequiemTest.ConfigTest do
              <<0x08, 0x68, 0x74, 0x74, 0x70, 0x2F, 0x31, 0x2E, 0x30, 0x08, 0x68, 0x74, 0x74, 0x70,
                0x2F, 0x31, 0x2E, 0x31>>
   end
-
-  test "config typo" do
-    opts1 = [enable_dgram: true]
-    assert Requiem.Config.check_key_existence(opts1) == :ok
-    opts2 = [enable_datagram: true]
-
-    assert_raise RuntimeError, fn ->
-      Requiem.Config.check_key_existence(opts2)
-    end
-  end
 end

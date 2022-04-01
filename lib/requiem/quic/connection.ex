@@ -7,6 +7,18 @@ defmodule Requiem.QUIC.Connection do
     NIF.connection_accept(config_ptr, scid, odcid, peer, sender_pid, stream_buf_size)
   end
 
+  @spec accept_connect_request(integer, integer) ::
+  {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def accept_connect_request(conn, session_id) do
+    NIF.connection_accept_connect_request(conn, session_id)
+  end
+
+  @spec reject_connect_request(integer, integer, integer) ::
+  {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def reject_connect_request(conn, session_id, code) do
+    NIF.connection_reject_connect_request(conn, session_id, code)
+  end
+
   @spec destroy(integer) ::
           :ok | {:error, :system_error | :already_closed}
   def destroy(conn) do
@@ -28,6 +40,12 @@ defmodule Requiem.QUIC.Connection do
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
   def dgram_send(conn, data) do
     NIF.connection_dgram_send(conn, data)
+  end
+
+  @spec open_stream(integer, boolean) ::
+          {:ok, non_neg_integer, non_neg_integer} | {:error, :system_error | :already_closed}
+  def open_stream(conn, is_bidi) do
+    NIF.connection_open_stream(conn, is_bidi)
   end
 
   @spec stream_send(integer, non_neg_integer, binary, boolean) ::
