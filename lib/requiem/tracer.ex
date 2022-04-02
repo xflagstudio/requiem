@@ -1,5 +1,8 @@
 defmodule Requiem.Tracer do
   @traceable Application.compile_env(:requiem, :trace, false)
+
+  def traceable(), do: @traceable
+
   defmacro trace(caller, msg) do
     if @traceable do
       quote do

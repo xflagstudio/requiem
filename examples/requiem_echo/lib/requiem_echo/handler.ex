@@ -37,9 +37,9 @@ defmodule RequiemEcho.Handler do
     Logger.debug("<Handler> handle_stream(#{stream_id}, #{data})")
 
     if Requiem.StreamId.is_bidi?(stream_id) do
-      stream_send(stream_id, "BIDI_RESPONSE: " <> data, false)
+      #stream_send(stream_id, "BIDI_RESPONSE: " <> data, false)
       # server initiated bidirectional stream not supported yet
-      #stream_open(true, "NEW_BIDI_RESPONSE:" <>  data)
+      stream_open(true, "NEW_BIDI_RESPONSE:" <>  data)
       {:ok, conn, state}
     else
       stream_open(false, "UNI_RESPONSE:" <>  data)

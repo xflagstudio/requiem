@@ -2,7 +2,8 @@ defmodule Requiem.NIF.Bridge do
   use Rustler,
     otp_app: :requiem,
     crate: "requiem_nif",
-    mode: :release
+    mode: :release,
+    load_data: Requiem.Tracer.traceable()
 
   @spec config_new() ::
           {:ok, integer} | {:error, :system_error | :not_found}

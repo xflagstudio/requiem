@@ -66,8 +66,20 @@ rustler::init!(
     load = load
 );
 
-fn load(env: Env, _: Term) -> bool {
-    SimpleLogger::init(log::LevelFilter::Debug, Config::default()).unwrap();
+fn load(env: Env, trace: Term) -> bool {
+    let log_level = match trace.decode::<bool>() {
+        Ok(traceable) => {
+            if traceable  {
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Error
+            }
+        },
+        Err(_) => {
+            log::LevelFilter::Error
+        },
+    };
+    SimpleLogger::init(log_level, Config::default()).unwrap();
     socket::on_load(env);
     true
 }
