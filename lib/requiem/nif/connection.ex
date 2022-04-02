@@ -7,16 +7,16 @@ defmodule Requiem.NIF.Connection do
     Bridge.connection_accept(config_ptr, scid, odcid, peer, sender_pid, stream_buf_size)
   end
 
-  @spec accept_connect_request(integer, integer) ::
-  {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def accept_connect_request(conn, session_id) do
-    Bridge.connection_accept_connect_request(conn, session_id)
+  @spec accept_connect_request(integer) ::
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def accept_connect_request(conn) do
+    Bridge.connection_accept_connect_request(conn)
   end
 
-  @spec reject_connect_request(integer, integer, integer) ::
-  {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def reject_connect_request(conn, session_id, code) do
-    Bridge.connection_reject_connect_request(conn, session_id, code)
+  @spec reject_connect_request(integer, integer) ::
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def reject_connect_request(conn, code) do
+    Bridge.connection_reject_connect_request(conn, code)
   end
 
   @spec destroy(integer) ::

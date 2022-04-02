@@ -103,16 +103,16 @@ defmodule Requiem.NIF.Bridge do
     do: error()
 
   @spec connection_open_stream(integer, boolean) ::
-    {:ok, non_neg_integer, non_neg_integer} | {:error, :system_error | :already_closed}
+          {:ok, non_neg_integer, non_neg_integer} | {:error, :system_error | :already_closed}
   def connection_open_stream(_conn_ptr, _is_bidi), do: error()
 
-  @spec connection_accept_connect_request(integer, integer) ::
-    {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_accept_connect_request(_conn_ptr, _session_id), do: error()
+  @spec connection_accept_connect_request(integer) ::
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def connection_accept_connect_request(_conn_ptr), do: error()
 
-  @spec connection_reject_connect_request(integer, integer, integer) ::
-    {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_reject_connect_request(_conn_ptr, _session_id, _code), do: error()
+  @spec connection_reject_connect_request(integer, integer) ::
+          {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
+  def connection_reject_connect_request(_conn_ptr, _code), do: error()
 
   @spec connection_destroy(integer) ::
           :ok | {:error, :system_error | :not_found}

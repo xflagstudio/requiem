@@ -9,7 +9,7 @@ use rustler::{Atom, Env, NifResult, ResourceArc};
 
 use crate::common::{self, atoms};
 use crate::socket::Peer;
-use quiche::webtransport::{Error, ServerEvent, WebTransportServer};
+use quiche::webtransport::{Error, ServerEvent, ServerSession};
 
 macro_rules! empty_vec {
     ($x:expr) => {
@@ -27,8 +27,7 @@ pub struct Connection {
     sender: LocalPid,
     dgram_buf: Vec<u8>,
     stream_buf: Vec<u8>,
-    webtransport: Option<Rc<RefCell<WebTransportServer>>>,
-    session_id: Option<u64>,
+    webtransport: Option<Rc<RefCell<ServerSession>>>,
     is_established: bool,
 }
 
@@ -46,13 +45,12 @@ impl Connection {
             dgram_buf: empty_vec!(1500),
             stream_buf: empty_vec!(default_stream_buf_size),
             webtransport: None,
-            session_id: None,
             is_established: false,
         }
     }
 
     pub fn initialize_webtransport(&mut self) -> Result<(), Atom> {
-        match WebTransportServer::with_transport(&mut self.raw, "requiem".to_string()) {
+        match ServerSession::with_transport(&mut self.raw) {
             Ok(server) => {
                 self.webtransport = Some(Rc::new(RefCell::new(server)));
                 Ok(())
@@ -99,17 +97,15 @@ impl Connection {
         }
     }
 
-    pub fn accept_connect_request(&mut self, env: &Env, session_id: u64) -> Result<u64, Atom> {
+    pub fn accept_connect_request(&mut self, env: &Env) -> Result<u64, Atom> {
         if let Some(transport) = &self.webtransport {
             debug!("webtransport.accept_connect_request");
             // TODO more extra headers
-            let result =
-                transport
-                    .borrow_mut()
-                    .accept_connect_request(&mut self.raw, session_id, None);
+            let result = transport
+                .borrow_mut()
+                .accept_connect_request(&mut self.raw, None);
             match result {
                 Ok(()) => {
-                    self.session_id = Some(session_id);
                     self.drain(env);
                     self.next_timeout()
                 }
@@ -124,21 +120,13 @@ impl Connection {
         }
     }
 
-    pub fn reject_connect_request(
-        &mut self,
-        env: &Env,
-        session_id: u64,
-        code: u32,
-    ) -> Result<u64, Atom> {
+    pub fn reject_connect_request(&mut self, env: &Env, code: u32) -> Result<u64, Atom> {
         if let Some(transport) = &self.webtransport {
             debug!("webtransport.reject_connect_request");
             // TODO more extra headers
-            let result = transport.borrow_mut().reject_connect_request(
-                &mut self.raw,
-                session_id,
-                code,
-                None,
-            );
+            let result = transport
+                .borrow_mut()
+                .reject_connect_request(&mut self.raw, code, None);
             match result {
                 Ok(()) => {
                     self.drain(env);
@@ -160,7 +148,7 @@ impl Connection {
             loop {
                 let mut t = transport.borrow_mut();
                 match t.poll(&mut self.raw) {
-                    Ok((stream_id, ServerEvent::ConnectRequest(req))) => {
+                    Ok(ServerEvent::ConnectRequest(req)) => {
                         let mut authority = OwnedBinary::new(req.authority().len()).unwrap();
                         authority
                             .as_mut_slice()
@@ -178,7 +166,6 @@ impl Connection {
                                 *env,
                                 &[
                                     atoms::__connect__().to_term(*env),
-                                    stream_id.encode(*env),
                                     authority.release(*env).to_term(*env),
                                     path.release(*env).to_term(*env),
                                     origin.release(*env).to_term(*env),
@@ -186,7 +173,7 @@ impl Connection {
                             ),
                         );
                     }
-                    Ok((stream_id, ServerEvent::StreamData(_session_id))) => {
+                    Ok(ServerEvent::StreamData(stream_id)) => {
                         while let Ok(len) =
                             t.recv_stream_data(&mut self.raw, stream_id, &mut self.stream_buf)
                         {
@@ -207,8 +194,8 @@ impl Connection {
                             }
                         }
                     }
-                    Ok((_flow_id, ServerEvent::Datagram)) => {
-                        while let Ok((total_len, _session_id, offset)) =
+                    Ok(ServerEvent::Datagram) => {
+                        while let Ok((offset, total_len)) =
                             t.recv_dgram(&mut self.raw, &mut self.dgram_buf)
                         {
                             let len = total_len - offset;
@@ -230,37 +217,34 @@ impl Connection {
                             }
                         }
                     }
-                    Ok((stream_id, ServerEvent::Reset(_e))) => {
+                    Ok(ServerEvent::SessionReset(_e)) => {
+                        env.send(pid, atoms::__reset__().to_term(*env));
+                    }
+                    Ok(ServerEvent::SessionFinished) => {
+                        env.send(pid, atoms::__session_finished__().to_term(*env));
+                    }
+                    Ok(ServerEvent::StreamFinished(stream_id)) => {
                         env.send(
                             pid,
                             make_tuple(
                                 *env,
-                                &[atoms::__reset__().to_term(*env), stream_id.encode(*env)],
+                                &[
+                                    atoms::__stream_finished__().to_term(*env),
+                                    stream_id.encode(*env),
+                                ],
                             ),
                         );
                     }
-                    Ok((stream_id, ServerEvent::Finished)) => {
-                        env.send(
-                            pid,
-                            make_tuple(
-                                *env,
-                                &[atoms::__finished__().to_term(*env), stream_id.encode(*env)],
-                            ),
-                        );
+                    Ok(ServerEvent::SessionGoAway) => {
+                        env.send(pid, atoms::__goaway__().to_term(*env));
                     }
-                    Ok((stream_id, ServerEvent::GoAway)) => {
-                        env.send(
-                            pid,
-                            make_tuple(
-                                *env,
-                                &[atoms::__goaway__().to_term(*env), stream_id.encode(*env)],
-                            ),
-                        );
-                    }
-                    Ok((stream_id, ServerEvent::HTTPEvent(ev))) => {
-                        debug!("untracked http event: {}:{:?}", stream_id, ev);
+                    Ok(ServerEvent::HTTPEvent(ev)) => {
+                        debug!("untracked http event: {:?}", ev);
                     }
                     Err(Error::Done) => break,
+                    Err(Error::Ignored) => {
+                        debug!("poll http3 event caught ignored event");
+                    }
                     Err(e) => {
                         error!("poll http3 event caught error: :{:?}", e);
                     }
@@ -283,25 +267,18 @@ impl Connection {
         if !self.raw.is_closed() {
             if let Some(transport) = &self.webtransport {
                 let transport = Rc::clone(transport);
-                if let Some(session_id) = self.session_id {
-                    match transport
-                        .borrow_mut()
-                        .open_stream(&mut self.raw, session_id, is_bidi)
-                    {
-                        Ok(stream_id) => {
-                            info!("opened new stream with stream-id: {}", stream_id);
-                            self.drain(env);
-                            self.next_timeout()
-                                .map(|next_timeout| (stream_id, next_timeout))
-                        }
-                        Err(e) => {
-                            error!("failed to open stream: {:?}", e);
-                            Err(atoms::system_error())
-                        }
+                let mut transport = transport.borrow_mut();
+                match transport.open_stream(&mut self.raw, is_bidi) {
+                    Ok(stream_id) => {
+                        info!("opened new stream with stream-id: {}", stream_id);
+                        self.drain(env);
+                        self.next_timeout()
+                            .map(|next_timeout| (stream_id, next_timeout))
                     }
-                } else {
-                    // TODO better error atom
-                    Err(atoms::system_error())
+                    Err(e) => {
+                        error!("failed to open stream: {:?}", e);
+                        Err(atoms::system_error())
+                    }
                 }
             } else {
                 // TODO better error atom
@@ -323,37 +300,30 @@ impl Connection {
         if !self.raw.is_closed() {
             if let Some(transport) = &self.webtransport {
                 let transport = Rc::clone(transport);
-                if let Some(session_id) = self.session_id {
-                    let mut pos = 0;
-                    loop {
-                        match transport.borrow_mut().send_stream_data(
-                            &mut self.raw,
-                            session_id,
-                            stream_id,
-                            data,
-                        ) {
-                            Ok(len) => {
-                                pos += len;
-                                self.drain(env);
-                                if pos >= size {
-                                    break;
-                                }
-                            }
-                            Err(Error::Done) => break,
-                            Err(e) => {
-                                error!("failed to send stream data: {:?}", e);
-                                return Err(atoms::system_error());
+                let mut pos = 0;
+                loop {
+                    match transport
+                        .borrow_mut()
+                        .send_stream_data(&mut self.raw, stream_id, data)
+                    {
+                        Ok(len) => {
+                            pos += len;
+                            self.drain(env);
+                            if pos >= size {
+                                break;
                             }
                         }
+                        Err(Error::Done) => break,
+                        Err(e) => {
+                            error!("failed to send stream data: {:?}", e);
+                            return Err(atoms::system_error());
+                        }
                     }
-                    if fin {
-                        let _ = self.raw.stream_send(stream_id, b"", true);
-                    }
-                    self.next_timeout()
-                } else {
-                    // TODO better error atom
-                    Err(atoms::system_error())
                 }
+                if fin {
+                    let _ = self.raw.stream_send(stream_id, b"", true);
+                }
+                self.next_timeout()
             } else {
                 // TODO better error atom
                 Err(atoms::system_error())
@@ -367,20 +337,13 @@ impl Connection {
         if !self.raw.is_closed() {
             if let Some(transport) = &self.webtransport {
                 let transport = Rc::clone(transport);
-                if let Some(session_id) = self.session_id {
-                    match transport
-                        .borrow_mut()
-                        .send_dgram(&mut self.raw, session_id, data)
-                    {
-                        Ok(()) => {
-                            self.drain(env);
-                            self.next_timeout()
-                        }
-                        Err(_e) => Err(atoms::system_error()),
+                let mut transport = transport.borrow_mut();
+                match transport.send_dgram(&mut self.raw, data) {
+                    Ok(()) => {
+                        self.drain(env);
+                        self.next_timeout()
                     }
-                } else {
-                    // TODO better error atom
-                    Err(atoms::system_error())
+                    Err(_e) => Err(atoms::system_error()),
                 }
             } else {
                 // TODO better error atom
@@ -481,14 +444,10 @@ pub fn connection_accept(
 }
 
 #[rustler::nif]
-pub fn connection_accept_connect_request(
-    env: Env,
-    conn_ptr: i64,
-    session_id: u64,
-) -> NifResult<(Atom, u64)> {
+pub fn connection_accept_connect_request(env: Env, conn_ptr: i64) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
-    match conn.accept_connect_request(&env, session_id) {
+    match conn.accept_connect_request(&env) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
@@ -498,12 +457,11 @@ pub fn connection_accept_connect_request(
 pub fn connection_reject_connect_request(
     env: Env,
     conn_ptr: i64,
-    session_id: u64,
     code: u32,
 ) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
-    match conn.reject_connect_request(&env, session_id, code) {
+    match conn.reject_connect_request(&env, code) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }

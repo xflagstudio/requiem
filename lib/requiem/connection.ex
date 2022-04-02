@@ -232,11 +232,11 @@ defmodule Requiem.Connection do
 
   @impl GenServer
   def handle_info(
-        {:__connect__, session_id, authority, path, origin},
+        {:__connect__, authority, path, origin},
         %{handler_initialized: false} = state
       ) do
     Tracer.trace(__MODULE__, state.trace_id, "@connect")
-    request = ConnectRequest.new(session_id, authority, path, origin)
+    request = ConnectRequest.new(authority, path, origin)
     conn = state.conn
 
     ExceptionGuard.guard(
@@ -249,9 +249,10 @@ defmodule Requiem.Connection do
           {:ok, %ConnectionState{} = conn_state, handler_state} ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed")
 
-            case NIF.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
+
                 {:noreply,
                  %{
                    state
@@ -278,9 +279,10 @@ defmodule Requiem.Connection do
           when is_integer(timeout) ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed with timeout")
 
-            case NIF.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
+
                 {:noreply,
                  %{
                    state
@@ -306,9 +308,10 @@ defmodule Requiem.Connection do
           {:ok, %ConnectionState{} = conn_state, handler_state, :hibernate} ->
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: completed with :hibernate")
 
-            case NIF.Connection.accept_connect_request(conn, request.session_id) do
+            case NIF.Connection.accept_connect_request(conn) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
+
                 {:noreply,
                  %{
                    state
@@ -335,7 +338,7 @@ defmodule Requiem.Connection do
             Tracer.trace(__MODULE__, state.trace_id, "@handler.init: stop")
             # TODO assert code >= 400 && code < 600
             # TODO pass reason
-            case NIF.Connection.reject_connect_request(conn, request.session_id, code) do
+            case NIF.Connection.reject_connect_request(conn, code) do
               {:ok, next_timeout} ->
                 state = reset_conn_timer(state, next_timeout)
                 {:noreply, state}
@@ -366,10 +369,10 @@ defmodule Requiem.Connection do
   end
 
   def handle_info(
-        {:__connect__, session_id, _authority, _path, _origin},
+        {:__connect__, _authority, _path, _origin},
         %{handler_initialized: true} = state
       ) do
-    case NIF.Connection.reject_connect_request(state.conn, session_id, 419) do
+    case NIF.Connection.reject_connect_request(state.conn, 419) do
       :ok ->
         {:noreply, state}
 
@@ -396,10 +399,16 @@ defmodule Requiem.Connection do
     {:noreply, state}
   end
 
-  def handle_info(:__finished__, state) do
+  def handle_info(:__session_finished__, state) do
     # HTTP3 stream finished
-    Tracer.trace(__MODULE__, state.trace_id, "@finished")
+    Tracer.trace(__MODULE__, state.trace_id, "@session_finished")
     close(false, :no_error, :shutdown)
+    {:noreply, state}
+  end
+
+  def handle_info({:__stream_finished__, _stream_id}, state) do
+    Tracer.trace(__MODULE__, state.trace_id, "@stream_finished")
+    # TODO
     {:noreply, state}
   end
 
@@ -556,6 +565,7 @@ defmodule Requiem.Connection do
 
   def handle_info({:__stream_open__, is_bidi, message}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@stream_open")
+
     case NIF.Connection.open_stream(state.conn, is_bidi) do
       {:ok, stream_id, next_timeout} ->
         Tracer.trace(
@@ -563,6 +573,7 @@ defmodule Requiem.Connection do
           state.trace_id,
           "@stream_open: completed. next_timeout: #{next_timeout}"
         )
+
         state = reset_conn_timer(state, next_timeout)
         handler_handle_info({:stream_open, stream_id, message}, state)
 
@@ -575,7 +586,6 @@ defmodule Requiem.Connection do
         Tracer.trace(__MODULE__, state.trace_id, "@stream_open: error")
         # close(false, 0, :server_error)
         {:noreply, state}
-
     end
   end
 

@@ -16,7 +16,8 @@ pub(crate) mod atoms {
         __packet__,
         __connect__, // webtransport connect request
         __reset__, // connected stream received http3 reset event
-        __finished__, // connected stream received http3 finished event
+        __session_finished__, // connected stream received http3 finished event
+        __stream_finished__, // connected stream received http3 finished event
         __goaway__, // connected stream received http3 goaway event
         __stream_recv__,
         __dgram_recv__,
