@@ -17,7 +17,7 @@ pub(crate) fn packet_type(ty: quiche::Type) -> Atom {
 pub(crate) fn header_token_binary(hdr: &quiche::Header) -> OwnedBinary {
     if let Some(t) = hdr.token.as_ref() {
         let mut token = OwnedBinary::new(t.len()).unwrap();
-        token.as_mut_slice().copy_from_slice(&t);
+        token.as_mut_slice().copy_from_slice(t);
         token
     } else {
         OwnedBinary::new(0).unwrap()
@@ -66,7 +66,7 @@ impl PacketBuilder {
         let scid = quiche::ConnectionId::from_ref(scid);
         let dcid = quiche::ConnectionId::from_ref(dcid);
         let odcid = quiche::ConnectionId::from_ref(odcid);
-        let len = quiche::retry(&scid, &odcid, &dcid, &token, version, &mut self.buf).unwrap();
+        let len = quiche::retry(&scid, &odcid, &dcid, token, version, &mut self.buf).unwrap();
         let mut resp = OwnedBinary::new(len).unwrap();
         resp.as_mut_slice().copy_from_slice(&self.buf[..len]);
         resp

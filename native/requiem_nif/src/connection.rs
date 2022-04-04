@@ -11,16 +11,6 @@ use crate::common::{self, atoms};
 use crate::socket::Peer;
 use quiche::webtransport::{Error, ServerEvent, ServerSession};
 
-macro_rules! empty_vec {
-    ($x:expr) => {
-        unsafe {
-            let mut v = Vec::with_capacity($x);
-            v.set_len($x);
-            v
-        }
-    };
-}
-
 pub struct Connection {
     raw: Pin<Box<quiche::Connection>>,
     peer: ResourceArc<Peer>,
@@ -42,8 +32,8 @@ impl Connection {
             raw,
             peer,
             sender,
-            dgram_buf: empty_vec!(1500),
-            stream_buf: empty_vec!(default_stream_buf_size),
+            dgram_buf: vec![0; 1500],
+            stream_buf: vec![0; default_stream_buf_size],
             webtransport: None,
             is_established: false,
         }
@@ -510,7 +500,7 @@ pub fn connection_on_packet(
 
     let mut packet = packet.to_owned().unwrap();
 
-    match conn.process_packet(&env, &pid, &mut packet.as_mut_slice()) {
+    match conn.process_packet(&env, &pid, packet.as_mut_slice()) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }

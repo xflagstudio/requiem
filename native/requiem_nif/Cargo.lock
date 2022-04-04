@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "quiche"
 version = "0.12.0"
-source = "git+https://github.com/lyokato/quiche?branch=0.12.0-webtransport-support#b8ab8c8e1a29040e8babdcbb359e3ddb83804186"
+source = "git+https://github.com/lyokato/quiche?branch=0.12.0-webtransport-support#51983feb1360c52cc0698b0c124fc603d8cfe33f"
 dependencies = [
  "cmake",
  "lazy_static",
