@@ -184,29 +184,37 @@ impl Connection {
                             }
                         }
                     }
-                    Ok(ServerEvent::Datagram) => {
-                        while let Ok((offset, total_len)) =
-                            t.recv_dgram(&mut self.raw, &mut self.dgram_buf)
-                        {
-                            let len = total_len - offset;
-                            if len > 0 {
-                                let mut data = OwnedBinary::new(len).unwrap();
-                                data.as_mut_slice()
-                                    .copy_from_slice(&self.dgram_buf[offset..total_len]);
+                    Ok(ServerEvent::Datagram) => loop {
+                        match t.recv_dgram(&mut self.raw, &mut self.dgram_buf) {
+                            Ok((offset, total_len)) => {
+                                let len = total_len - offset;
+                                if len > 0 {
+                                    let mut data = OwnedBinary::new(len).unwrap();
+                                    data.as_mut_slice()
+                                        .copy_from_slice(&self.dgram_buf[offset..total_len]);
 
-                                env.send(
-                                    pid,
-                                    make_tuple(
-                                        *env,
-                                        &[
-                                            atoms::__dgram_recv__().to_term(*env),
-                                            data.release(*env).to_term(*env),
-                                        ],
-                                    ),
-                                );
+                                    env.send(
+                                        pid,
+                                        make_tuple(
+                                            *env,
+                                            &[
+                                                atoms::__dgram_recv__().to_term(*env),
+                                                data.release(*env).to_term(*env),
+                                            ],
+                                        ),
+                                    );
+                                }
+                            }
+                            Err(Error::DatagramSessionIdMismatch) => {
+                                info!("datagram found, but it's not for this session.");
+                            }
+                            Err(Error::Done) => break,
+                            Err(e) => {
+                                error!("failed to receive dgram: {:?}", e);
+                                break;
                             }
                         }
-                    }
+                    },
                     Ok(ServerEvent::SessionReset(_e)) => {
                         env.send(pid, atoms::__reset__().to_term(*env));
                     }
@@ -228,13 +236,10 @@ impl Connection {
                     Ok(ServerEvent::SessionGoAway) => {
                         env.send(pid, atoms::__goaway__().to_term(*env));
                     }
-                    Ok(ServerEvent::HTTPEvent(ev)) => {
-                        debug!("untracked http event: {:?}", ev);
+                    Ok(ServerEvent::BypassedHTTPEvent(sid, ev)) => {
+                        debug!("an event which is not related to WebTransport: stream_id({}), event({:?})", sid, ev);
                     }
                     Err(Error::Done) => break,
-                    Err(Error::Ignored) => {
-                        debug!("poll http3 event caught ignored event");
-                    }
                     Err(e) => {
                         error!("poll http3 event caught error: :{:?}", e);
                     }
