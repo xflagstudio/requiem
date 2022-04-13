@@ -73,7 +73,7 @@ impl Connection {
                         self.is_established = true;
                         self.initialize_webtransport()?;
                     }
-                    self.poll_webtransport_events(env, pid);
+                    self.poll_webtransport_events(env, pid)?;
                     self.drain(env);
                     self.next_timeout()
                 }
@@ -133,7 +133,7 @@ impl Connection {
         }
     }
 
-    pub fn poll_webtransport_events(&mut self, env: &Env, pid: &LocalPid) {
+    pub fn poll_webtransport_events(&mut self, env: &Env, pid: &LocalPid) -> Result<(), Atom> {
         if let Some(transport) = &self.webtransport {
             loop {
                 let mut t = transport.borrow_mut();
@@ -186,7 +186,7 @@ impl Connection {
                     }
                     Ok(ServerEvent::Datagram) => loop {
                         match t.recv_dgram(&mut self.raw, &mut self.dgram_buf) {
-                            Ok((offset, total_len)) => {
+                            Ok((in_session, offset, total_len)) => if in_session {
                                 let len = total_len - offset;
                                 if len > 0 {
                                     let mut data = OwnedBinary::new(len).unwrap();
@@ -205,13 +205,10 @@ impl Connection {
                                     );
                                 }
                             }
-                            Err(Error::DatagramSessionIdMismatch) => {
-                                info!("datagram found, but it's not for this session.");
-                            }
                             Err(Error::Done) => break,
                             Err(e) => {
                                 error!("failed to receive dgram: {:?}", e);
-                                break;
+                                return Err(atoms::system_error());
                             }
                         }
                     },
@@ -236,16 +233,18 @@ impl Connection {
                     Ok(ServerEvent::SessionGoAway) => {
                         env.send(pid, atoms::__goaway__().to_term(*env));
                     }
-                    Ok(ServerEvent::BypassedHTTPEvent(sid, ev)) => {
+                    Ok(ServerEvent::Other(sid, ev)) => {
                         debug!("an event which is not related to WebTransport: stream_id({}), event({:?})", sid, ev);
                     }
                     Err(Error::Done) => break,
                     Err(e) => {
                         error!("poll http3 event caught error: :{:?}", e);
+                        return Err(atoms::system_error());
                     }
                 }
             }
         }
+        Ok(())
     }
 
     pub fn execute_timeout(&mut self, env: &Env) -> Result<u64, Atom> {

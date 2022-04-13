@@ -172,6 +172,10 @@ defmodule MyApp.MyHandler do
 
   @impl Requiem
   def init(conn, request) do
+    # XXX you can validate this request with following params
+    # request.authority
+    # request.path
+    # request.origin
     {:ok, conn, %{}}
   end
 
