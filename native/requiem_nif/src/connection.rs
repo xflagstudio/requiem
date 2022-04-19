@@ -9,7 +9,7 @@ use rustler::{Atom, Env, NifResult, ResourceArc};
 
 use crate::common::{self, atoms};
 use crate::socket::Peer;
-use quiche::webtransport::{Error, ServerEvent, ServerSession};
+use quiche::h3::webtransport::{Error, ServerEvent, ServerSession};
 
 pub struct Connection {
     raw: Pin<Box<quiche::Connection>>,
