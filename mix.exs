@@ -32,7 +32,7 @@ defmodule Requiem.MixProject do
 
   defp package() do
     [
-      description: "A QuicTransport server framework.",
+      description: "A WebTransport server framework.",
       files: ["lib", "mix.exs", "README*", "LICENSE*", "native", "test"],
       licenses: ["MIT"],
       links: %{
