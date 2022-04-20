@@ -1,6 +1,6 @@
 [package]
 name = "requiem_nif"
-version = "0.3.10"
+version = "0.4.0"
 authors = []
 edition = "2021"
 
@@ -19,5 +19,7 @@ strip = true
 rustler = "0.22"
 socket2 = { version= "0.2", features = ["reuseport"] }
 num_cpus = "1.13"
-quiche = "0.12.0"
+log = "0.4.16"
+simplelog = "0.10.0"
+quiche = { git ="https://github.com/lyokato/quiche", branch = "0.12.0-webtransport-support" }
 crossbeam-channel = "0.5"

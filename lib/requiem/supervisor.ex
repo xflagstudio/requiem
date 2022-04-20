@@ -6,7 +6,7 @@ defmodule Requiem.Supervisor do
   use Supervisor
   alias Requiem.AddressTable
   alias Requiem.Config
-  alias Requiem.QUIC
+  alias Requiem.NIF
   alias Requiem.ConnectionRegistry
   alias Requiem.ConnectionSupervisor
   alias Requiem.DispatcherSupervisor
@@ -47,7 +47,7 @@ defmodule Requiem.Supervisor do
 
     num_socket =
       if socket_pool_size == 0 do
-        QUIC.Socket.cpu_num()
+        NIF.Socket.cpu_num()
       else
         socket_pool_size
       end
@@ -58,7 +58,7 @@ defmodule Requiem.Supervisor do
     read_timeout = Config.get!(handler, :socket_read_timeout)
     write_timeout = Config.get!(handler, :socket_write_timeout)
 
-    case QUIC.Socket.new(num_socket, read_timeout, write_timeout) do
+    case NIF.Socket.new(num_socket, read_timeout, write_timeout) do
       {:ok, socket_ptr} ->
         [
           {Registry, keys: :unique, name: ConnectionRegistry.name(handler)},

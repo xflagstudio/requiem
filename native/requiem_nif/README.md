@@ -1,4 +1,4 @@
-# NIF for Elixir.Requiem.QUIC.NIF
+# NIF for Elixir.Requiem.NIF.Bridge
 
 ## To build the NIF module:
 
@@ -9,7 +9,7 @@
 ## To load the NIF:
 
 ```elixir
-defmodule Requiem.QUIC.NIF do
+defmodule Requiem.NIF.Bridge do
     use Rustler, otp_app: :requiem, crate: "requiem_nif"
 
     # When your NIF is loaded, it will override this function.

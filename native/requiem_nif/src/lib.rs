@@ -1,5 +1,10 @@
 use rustler::{Env, Term};
 
+#[macro_use]
+extern crate log;
+
+use simplelog::{Config, SimpleLogger};
+
 mod common;
 mod config;
 mod connection;
@@ -7,7 +12,7 @@ mod packet;
 mod socket;
 
 rustler::init!(
-    "Elixir.Requiem.QUIC.NIF",
+    "Elixir.Requiem.NIF.Bridge",
     [
         config::config_new,
         config::config_destroy,
@@ -39,6 +44,9 @@ rustler::init!(
         packet::packet_builder_build_retry,
         connection::connection_accept,
         connection::connection_destroy,
+        connection::connection_open_stream,
+        connection::connection_accept_connect_request,
+        connection::connection_reject_connect_request,
         connection::connection_close,
         connection::connection_is_closed,
         connection::connection_on_packet,
@@ -58,7 +66,18 @@ rustler::init!(
     load = load
 );
 
-fn load(env: Env, _: Term) -> bool {
+fn load(env: Env, trace: Term) -> bool {
+    let log_level = match trace.decode::<bool>() {
+        Ok(traceable) => {
+            if traceable {
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Error
+            }
+        }
+        Err(_) => log::LevelFilter::Error,
+    };
+    SimpleLogger::init(log_level, Config::default()).unwrap();
     socket::on_load(env);
     true
 }

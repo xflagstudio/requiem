@@ -1,7 +1,7 @@
 defmodule Requiem.Address do
   use Bitwise
 
-  alias Requiem.QUIC
+  alias Requiem.NIF
 
   @type t :: %__MODULE__{
           host: :inet.ip_address(),
@@ -13,7 +13,7 @@ defmodule Requiem.Address do
 
   @spec from_rust_peer(term) :: t
   def from_rust_peer(peer) do
-    {:ok, host, port} = QUIC.Socket.address_parts(peer)
+    {:ok, host, port} = NIF.Socket.address_parts(peer)
 
     if byte_size(host) == 4 do
       <<n1, n2, n3, n4>> = host

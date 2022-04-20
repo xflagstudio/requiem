@@ -133,7 +133,7 @@ impl SocketCluster {
         let mut sockets: Vec<Option<UdpSocket>> = Vec::with_capacity(num_node);
 
         for _n in 0..num_node {
-            let sock = Self::build_socket(&addr, self.read_timeout, self.write_timeout)?;
+            let sock = Self::build_socket(addr, self.read_timeout, self.write_timeout)?;
             sockets.push(Some(sock));
         }
 
