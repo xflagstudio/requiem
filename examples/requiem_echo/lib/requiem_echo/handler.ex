@@ -10,6 +10,11 @@ defmodule RequiemEcho.Handler do
   end
 
   @impl Requiem
+  def handle_info({:stream_open, stream_id, message}, conn, state) do
+    Logger.debug("<Handler> handle_info: stream_open(#{stream_id})")
+    stream_send(stream_id, message, false)
+    {:noreply, conn, state}
+  end
   def handle_info(_request, conn, state) do
     Logger.debug("<Handler> handle_info")
     {:noreply, conn, state}
@@ -32,12 +37,12 @@ defmodule RequiemEcho.Handler do
     Logger.debug("<Handler> handle_stream(#{stream_id}, #{data})")
 
     if Requiem.StreamId.is_bidi?(stream_id) do
-      stream_send(stream_id, data, false)
+      stream_send(stream_id, "BIDI_RESPONSE: " <> data, false)
+      stream_open(true, "NEW_BIDI_RESPONSE:" <>  data)
       {:ok, conn, state}
     else
-      {stream_id, conn2} = Requiem.ConnectionState.create_new_stream_id(conn, :uni)
-      stream_send(stream_id, data, false)
-      {:ok, conn2, state}
+      stream_open(false, "UNI_RESPONSE:" <>  data)
+      {:ok, conn, state}
     end
   end
 

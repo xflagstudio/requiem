@@ -361,6 +361,10 @@ defmodule Requiem do
         end
       end
 
+      @spec stream_open(boolean, term) :: no_return
+      def stream_open(is_bidi, message),
+        do: send(self(), {:__stream_open__, is_bidi, message})
+
       @spec dgram_send(binary) :: no_return
       def dgram_send(data),
         do: send(self(), {:__dgram_send__, data})

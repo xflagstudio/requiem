@@ -1,9 +1,9 @@
 defmodule RequiemTest.ConnectionTest do
   use ExUnit.Case, async: true
 
-  alias Requiem.QUIC.Config
-  alias Requiem.QUIC.Socket
-  alias Requiem.QUIC.Connection
+  alias Requiem.NIF.Config
+  alias Requiem.NIF.Socket
+  alias Requiem.NIF.Connection
 
   defmodule TestSender do
     use GenServer

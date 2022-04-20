@@ -5,14 +5,16 @@
 
 ## Description
 
-This is Elixir framework for running QuicTransport(WebTransport over QUIC) server.
+This is Elixir framework for running WebTransport (over http/3) server.
 
 - https://w3c.github.io/webtransport/
-- https://tools.ietf.org/html/draft-vvv-webtransport-quic-02
+- https://www.ietf.org/id/draft-ietf-webtrans-http3-02.html
 
 This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche).
 
 **quiche** is written in **Rust**, so you need to prepare Rust compiler to build this library.
+
+At this time, quiche does not support WebTransport, so [a forked and edited version](https://github.com/lyokato/quiche/tree/0.12.0-webtransport-support) is used.
 
 ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge between elixir and rust.
 
@@ -171,7 +173,11 @@ defmodule MyApp.MyHandler do
   use Requiem, otp_app: :my_app
 
   @impl Requiem
-  def init(conn, client) do
+  def init(conn, request) do
+    # XXX you can validate this request with following params
+    # request.authority
+    # request.path
+    # request.origin
     {:ok, conn, %{}}
   end
 
@@ -204,7 +210,7 @@ defmodule MyApp.MyHandler do
 end
 ```
 
-If you are familiar with GenServer, you will see familiar names in the list. There are some parameters that you may not have seen before, such as `conn` and `client`, but other than that, you can probably guess how it behaves.
+If you are familiar with GenServer, you will see familiar names in the list. There are some parameters that you may not have seen before, such as `conn` and `request`, but other than that, you can probably guess how it behaves.
 
 You can hook initialization and termination processes with `init/2` and `terminate/3`, and receive inter-process messages with `handle_info/3`, `handle_cast/3`, and `handle_call/4`.
 
@@ -216,7 +222,7 @@ defmodule MyApp.MyHandler do
   use Requiem, otp_app: :my_app
 
   @impl Requiem
-  def init(conn, client) do
+  def init(conn, request) do
     {:ok, conn, %{}}
   end
 
@@ -255,29 +261,7 @@ defmodule MyApp.MyHandler do
 end
 ```
 
-To use datagrams, you need to set the **enable_dgram** config to true.
-
-```elixir
-config :my_app, MyApp.MyHandler,
-  host: "0.0,0.0",
-  port: 443,
-  cert_chain: System.get_env("CERT"),
-  priv_key: System.get_env("PRIV_KEY"),
-  max_idle_timeout: 50000,
-  initial_max_data: 10_000_000,
-  max_udp_payload_size: 1350,
-  initial_max_stream_data_bidi_local: 1_000_000,
-  initial_max_stream_data_bidi_remote: 1_000_000,
-  initial_max_stream_data_uni: 1_000_000,
-  initial_max_streams_uni: 10,
-  initial_max_streams_bidi: 10,
-  disable_active_migration: true,
-  enable_early_data: true,
-  enable_dgram: true
-```
-
 Once you have done this, you can open the [WebTransport example page](https://googlechrome.github.io/samples/webtransport/client.html) in Google Chrome and try to interact with it.
-
 
 For more information on the various callbacks and the various functions that can be called from here, see [Handler](https://github.com/xflagstudio/requiem/wiki/Handler).
 
