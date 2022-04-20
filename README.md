@@ -14,6 +14,8 @@ This library depends on [cloudflare/quiche](https://github.com/cloudflare/quiche
 
 **quiche** is written in **Rust**, so you need to prepare Rust compiler to build this library.
 
+At this time, quiche does not support WebTransport, so [a forked and edited version](https://github.com/lyokato/quiche/tree/0.12.0-webtransport-support) is used.
+
 ReQUIem requires [Rustler](https://github.com/rusterlium/rustler) to bridge between elixir and rust.
 
 ## Note
