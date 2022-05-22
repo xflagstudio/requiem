@@ -314,25 +314,25 @@ impl SocketCluster {
                     },
                     recv(sender_rx) -> msg => {
                         if let Ok((peer, packet)) = msg {
-                            'send: loop {
+                            //'send: loop {
+                                debug!("send_to {}", &peer.to_string());
                                 match sock.send_to(&packet, peer) {
                                     Ok(_) => {
-                                        break 'send;
+                                        debug!("send_to: succeeded");
                                     },
                                     Err(e) => {
                                         match e.kind() {
-                                            std::io::ErrorKind::WouldBlock => {
-                                                continue 'send;
+                                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => {
+                                                debug!("send_to: blocked");
                                             },
                                             _ => {
-                                                //error!("sender IO error: {:?}", e);
-                                                break 'send;
+                                                debug!("sender IO error: {:?}", e);
                                             }
 
                                         }
                                     },
                                 }
-                            }
+                            //}
                         }
                     }
                 }
