@@ -306,7 +306,6 @@ impl SocketCluster {
 
         let handle = thread::spawn(move || {
             barrier.wait();
-
             loop {
                 select! {
                     recv(closer_rx) -> _ => {
@@ -314,24 +313,22 @@ impl SocketCluster {
                     },
                     recv(sender_rx) -> msg => {
                         if let Ok((peer, packet)) = msg {
-                            'send: loop {
-                                match sock.send_to(&packet, peer) {
-                                    Ok(_) => {
-                                        break 'send;
-                                    },
-                                    Err(e) => {
-                                        match e.kind() {
-                                            std::io::ErrorKind::WouldBlock => {
-                                                continue 'send;
-                                            },
-                                            _ => {
-                                                //error!("sender IO error: {:?}", e);
-                                                break 'send;
-                                            }
-
+                            debug!("send_to {} ({})", &peer.to_string(), packet.len());
+                            match sock.send_to(&packet, peer) {
+                                Ok(_) => {
+                                    debug!("send_to: succeeded");
+                                },
+                                Err(e) => {
+                                    match e.kind() {
+                                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => {
+                                            debug!("send_to: blocked");
+                                        },
+                                        _ => {
+                                            debug!("sender IO error: {:?}", e);
                                         }
-                                    },
-                                }
+
+                                    }
+                                },
                             }
                         }
                     }
