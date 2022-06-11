@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "quiche"
 version = "0.12.0"
-source = "git+https://github.com/lyokato/quiche?branch=0.12.0-webtransport-support#5913660404a9fc237590e8e1f05d3b4a869aa4d3"
+source = "git+https://github.com/lyokato/quiche?branch=0.12.0-path-validation#46460872860c2c00ee0ed7343bfd48a67da17623"
 dependencies = [
  "cmake",
  "lazy_static",
@@ -213,6 +213,7 @@ dependencies = [
  "log",
  "num_cpus",
  "quiche",
+ "ring",
  "rustler",
  "simplelog",
  "socket2",

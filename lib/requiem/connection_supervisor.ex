@@ -8,7 +8,6 @@ defmodule Requiem.ConnectionSupervisor do
   use DynamicSupervisor
 
   alias Requiem.Address
-  alias Requiem.AddressTable
   alias Requiem.Connection
   alias Requiem.ConnectionRegistry
   alias Requiem.Tracer
@@ -24,19 +23,9 @@ defmodule Requiem.ConnectionSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  @spec lookup_connection(module, binary, Address.t(), boolean) ::
+  @spec lookup_connection(module, binary) ::
           {:ok, pid} | {:error, :not_found}
-  def lookup_connection(handler, <<>>, address, true) do
-    case AddressTable.lookup(handler, address) do
-      {:ok, dcid} ->
-        ConnectionRegistry.lookup(handler, dcid)
-
-      {:error, :not_found} ->
-        {:error, :not_found}
-    end
-  end
-
-  def lookup_connection(handler, dcid, _address, _allow_address_routing),
+  def lookup_connection(handler, dcid),
     do: ConnectionRegistry.lookup(handler, dcid)
 
   @spec create_connection(
@@ -45,7 +34,6 @@ defmodule Requiem.ConnectionSupervisor do
           binary,
           binary,
           binary,
-          boolean,
           integer,
           pid
         ) ::
@@ -56,7 +44,6 @@ defmodule Requiem.ConnectionSupervisor do
         scid,
         dcid,
         odcid,
-        allow_address_routing,
         config_ptr,
         sender_pid
       ) do
@@ -70,7 +57,6 @@ defmodule Requiem.ConnectionSupervisor do
           dcid: dcid,
           scid: scid,
           odcid: odcid,
-          allow_address_routing: allow_address_routing,
           config_ptr: config_ptr,
           sender_pid: sender_pid
         ]

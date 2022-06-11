@@ -4,9 +4,7 @@ defmodule Requiem.Connection do
   use GenServer, restart: :temporary
 
   alias Requiem.Address
-  alias Requiem.AddressTable
   alias Requiem.ConnectRequest
-  alias Requiem.Config
   alias Requiem.ExceptionGuard
   alias Requiem.ErrorCode
   alias Requiem.ConnectionRegistry
@@ -19,7 +17,6 @@ defmodule Requiem.Connection do
           handler_state: any,
           handler_initialized: boolean,
           webtransport_initialized: boolean,
-          allow_address_routing: boolean,
           trace_id: binary,
           conn_state: ConnectionState.t(),
           conn: any,
@@ -30,7 +27,6 @@ defmodule Requiem.Connection do
             handler_state: nil,
             handler_initialized: false,
             webtransport_initialized: false,
-            allow_address_routing: false,
             trace_id: nil,
             conn_state: nil,
             conn: nil,
@@ -74,14 +70,6 @@ defmodule Requiem.Connection do
              ) do
           {:ok, _pid} ->
             Tracer.trace(__MODULE__, state.trace_id, "@init: registered")
-
-            if state.allow_address_routing do
-              AddressTable.insert(
-                state.handler,
-                state.conn_state.address,
-                state.conn_state.dcid
-              )
-            end
 
             {:ok, %{state | conn: conn}}
 
@@ -159,10 +147,10 @@ defmodule Requiem.Connection do
   end
 
   @impl GenServer
-  def handle_cast({:__packet__, _address, packet}, state) do
+  def handle_cast({:__packet__, address, packet}, state) do
     Tracer.trace(__MODULE__, state.trace_id, "@packet")
 
-    case NIF.Connection.on_packet(state.conn, packet) do
+    case NIF.Connection.on_packet(state.conn, packet, address.raw) do
       {:ok, next_timeout} ->
         Tracer.trace(
           __MODULE__,
@@ -721,13 +709,6 @@ defmodule Requiem.Connection do
       state.conn_state.dcid
     )
 
-    if state.allow_address_routing do
-      AddressTable.delete(
-        state.handler,
-        state.conn_state.address
-      )
-    end
-
     if state.handler_initialized do
       ExceptionGuard.guard(
         fn -> :ok end,
@@ -793,7 +774,6 @@ defmodule Requiem.Connection do
       handler_state: nil,
       handler_initialized: false,
       webtransport_initialized: false,
-      allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       trace_id: trace_id,
       conn_state: ConnectionState.new(address, dcid, scid, odcid),
       conn: nil,

@@ -4,7 +4,6 @@ defmodule Requiem.Supervisor do
   """
   require Logger
   use Supervisor
-  alias Requiem.AddressTable
   alias Requiem.Config
   alias Requiem.NIF
   alias Requiem.ConnectionRegistry
@@ -33,10 +32,6 @@ defmodule Requiem.Supervisor do
   @impl Supervisor
   def init([handler, otp_app]) do
     handler |> Config.init(otp_app)
-
-    if handler |> Config.get(:allow_address_routing) do
-      handler |> AddressTable.init()
-    end
 
     handler |> children() |> Supervisor.init(strategy: :one_for_one)
   end
@@ -77,8 +72,7 @@ defmodule Requiem.Supervisor do
              token_secret: handler |> Config.get!(:token_secret),
              conn_id_secret: handler |> Config.get!(:connection_id_secret),
              number_of_dispatchers: dispatcher_pool_size,
-             number_of_sockets: num_socket,
-             allow_address_routing: handler |> Config.get!(:allow_address_routing)
+             number_of_sockets: num_socket
            ]},
           {Transport,
            [

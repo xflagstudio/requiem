@@ -20,7 +20,6 @@ defmodule Requiem.DispatcherWorker do
           conn_id_secret: binary,
           worker_index: non_neg_integer,
           number_of_sockets: non_neg_integer,
-          allow_address_routing: boolean,
           config_ptr: integer,
           sender_pid: pid,
           packet_builder: integer,
@@ -34,7 +33,6 @@ defmodule Requiem.DispatcherWorker do
             number_of_sockets: 0,
             config_ptr: 0,
             sender_pid: nil,
-            allow_address_routing: false,
             packet_builder: 0,
             trace_id: ""
 
@@ -161,7 +159,6 @@ defmodule Requiem.DispatcherWorker do
       number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
       token_secret: Keyword.fetch!(opts, :token_secret),
       conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
-      allow_address_routing: Keyword.fetch!(opts, :allow_address_routing),
       config_ptr: 0,
       trace_id: inspect(self())
     }
@@ -176,9 +173,7 @@ defmodule Requiem.DispatcherWorker do
        when byte_size(dcid) == 20 or byte_size(dcid) == 0 do
     case ConnectionSupervisor.lookup_connection(
            state.handler,
-           dcid,
-           address,
-           state.allow_address_routing
+           dcid
          ) do
       {:ok, pid} ->
         Connection.process_packet(pid, address, packet)
@@ -262,9 +257,7 @@ defmodule Requiem.DispatcherWorker do
   defp handle_init_packet(address, packet, scid, dcid, token, version, state) do
     case ConnectionSupervisor.lookup_connection(
            state.handler,
-           dcid,
-           address,
-           state.allow_address_routing
+           dcid
          ) do
       {:ok, pid} ->
         Connection.process_packet(pid, address, packet)
@@ -291,7 +284,6 @@ defmodule Requiem.DispatcherWorker do
       scid,
       dcid,
       odcid,
-      state.allow_address_routing,
       state.config_ptr,
       state.sender_pid
     )
