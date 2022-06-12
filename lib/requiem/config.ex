@@ -11,7 +11,6 @@ defmodule Requiem.Config do
           | :socket_pool_size
           | :socket_read_timeout
           | :socket_write_timeout
-          | :allow_address_routing
           | :token_secret
           | :connection_id_secret
           | :dgram_queue_size
@@ -45,7 +44,6 @@ defmodule Requiem.Config do
     socket_pool_size: 0,
     socket_read_timeout: 100,
     socket_write_timeout: 100,
-    allow_address_routing: false,
     token_secret: :crypto.strong_rand_bytes(16),
     connection_id_secret: :crypto.strong_rand_bytes(32),
     max_udp_payload_size: 1350,
@@ -68,7 +66,6 @@ defmodule Requiem.Config do
     socket_pool_size: true,
     socket_read_timeout: true,
     socket_write_timeout: true,
-    allow_address_routing: true,
     token_secret: true,
     connection_id_secret: true,
     dgram_queue_size: true,

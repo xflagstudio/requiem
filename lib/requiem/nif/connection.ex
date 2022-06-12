@@ -54,10 +54,10 @@ defmodule Requiem.NIF.Connection do
     Bridge.connection_stream_send(conn, stream_id, data, fin)
   end
 
-  @spec on_packet(integer, binary) ::
+  @spec on_packet(integer, binary, term) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def on_packet(conn, packet) do
-    Bridge.connection_on_packet(self(), conn, packet)
+  def on_packet(conn, packet, peer) do
+    Bridge.connection_on_packet(self(), conn, packet, peer)
   end
 
   @spec on_timeout(integer) :: {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
