@@ -4,7 +4,7 @@ defmodule Requiem.MixProject do
   def project do
     [
       app: :requiem,
-      version: "0.4.1",
+      version: "0.4.2",
       elixir: "~> 1.11",
       package: package(),
       start_permanent: Mix.env() == :prod,
