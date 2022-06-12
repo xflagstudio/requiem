@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::net::SocketAddr;
+use ring::rand::{SecureRandom, SystemRandom};
 
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::types::tuple::make_tuple;
@@ -11,6 +13,64 @@ use crate::common::{self, atoms};
 use crate::socket::Peer;
 use quiche::h3::webtransport::{Error, ServerEvent, ServerSession};
 
+pub struct AddressValidationState {
+    validated: bool,
+    challenge: Option<[u8; 8]>,
+    allowed_packet_num_while_invalidated: usize,
+    packet_counter: usize,
+}
+
+impl AddressValidationState {
+    pub fn new(allowed_packet_num_while_invalidated: usize) -> Self {
+        Self {
+            validated: true,
+            challenge: None,
+            allowed_packet_num_while_invalidated,
+            packet_counter: 0,
+        }
+    }
+
+    pub fn is_validated(&self) -> bool {
+        self.validated
+    }
+
+    pub fn invalidate(&mut self) -> [u8; 8] {
+        self.validated = false;
+        let mut data = [0u8; 8];
+        let _ = SystemRandom::new().fill(&mut data);
+        self.challenge = Some(data);
+        self.packet_counter = 0;
+        data
+    }
+
+    pub fn validate(&mut self, data: &[u8; 8]) -> bool {
+        if self.validated {
+            true
+        } else if let Some(challenge) = &self.challenge {
+            if challenge == data {
+                self.challenge = None;
+                self.validated = true;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    pub fn check_sendable(&mut self) -> bool {
+        if self.validated {
+            true
+        } else if self.packet_counter < self.allowed_packet_num_while_invalidated {
+            self.packet_counter += 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub struct Connection {
     raw: Pin<Box<quiche::Connection>>,
     peer: ResourceArc<Peer>,
@@ -19,6 +79,7 @@ pub struct Connection {
     stream_buf: Vec<u8>,
     webtransport: Option<Rc<RefCell<ServerSession>>>,
     is_established: bool,
+    address_validation: AddressValidationState,
 }
 
 impl Connection {
@@ -36,6 +97,7 @@ impl Connection {
             stream_buf: vec![0; default_stream_buf_size],
             webtransport: None,
             is_established: false,
+            address_validation: AddressValidationState::new(100),
         }
     }
 
@@ -61,7 +123,15 @@ impl Connection {
         env: &Env,
         pid: &LocalPid,
         packet: &mut [u8],
+        addr: SocketAddr,
     ) -> Result<u64, Atom> {
+
+        if self.peer.addr != addr {
+            self.peer = ResourceArc::new(Peer::new(addr));
+            let data = self.address_validation.invalidate();
+            self.raw.send_path_challenge(data);
+        }
+
         if !self.raw.is_closed() {
             let info = quiche::RecvInfo {
                 from: self.peer.addr,
@@ -72,6 +142,11 @@ impl Connection {
                         info!("established QUIC connection, initialize webtransport.");
                         self.is_established = true;
                         self.initialize_webtransport()?;
+                    }
+                    if !self.address_validation.is_validated() {
+                        if let Some(resp) = self.raw.take_path_response() {
+                            self.address_validation.validate(&resp);
+                        }
                     }
                     self.poll_webtransport_events(env, pid)?;
                     self.drain(env);
@@ -369,21 +444,23 @@ impl Connection {
         loop {
             match self.raw.send(&mut self.dgram_buf) {
                 Ok((len, _send_info)) => {
-                    let mut packet = OwnedBinary::new(len).unwrap();
-                    packet
-                        .as_mut_slice()
-                        .copy_from_slice(&self.dgram_buf[..len]);
-                    env.send(
-                        &self.sender,
-                        make_tuple(
-                            *env,
-                            &[
-                                atoms::__drain__().to_term(*env),
-                                self.peer.encode(*env),
-                                packet.release(*env).to_term(*env),
-                            ],
-                        ),
-                    );
+                    if self.address_validation.check_sendable() {
+                        let mut packet = OwnedBinary::new(len).unwrap();
+                        packet
+                            .as_mut_slice()
+                            .copy_from_slice(&self.dgram_buf[..len]);
+                        env.send(
+                            &self.sender,
+                            make_tuple(
+                                *env,
+                                &[
+                                    atoms::__drain__().to_term(*env),
+                                    self.peer.encode(*env),
+                                    packet.release(*env).to_term(*env),
+                                ],
+                            ),
+                        );
+                    }
                 }
                 Err(quiche::Error::Done) => {
                     break;
@@ -498,13 +575,14 @@ pub fn connection_on_packet(
     pid: LocalPid,
     conn_ptr: i64,
     packet: Binary,
+    peer: ResourceArc<Peer>,
 ) -> NifResult<(Atom, u64)> {
     let conn_ptr = conn_ptr as *mut Connection;
     let conn = unsafe { &mut *conn_ptr };
 
     let mut packet = packet.to_owned().unwrap();
 
-    match conn.process_packet(&env, &pid, packet.as_mut_slice()) {
+    match conn.process_packet(&env, &pid, packet.as_mut_slice(), peer.addr) {
         Ok(next_timeout) => Ok((atoms::ok(), next_timeout)),
         Err(reason) => Err(common::error_term(reason)),
     }
