@@ -54,25 +54,29 @@ pub struct SocketCluster {
 }
 
 impl SocketCluster {
-    fn build_socket(addr: &str, read_timeout: u64, write_timeout: u64) -> Result<UdpSocket, Atom> {
+    fn build_socket(addr: &str, read_timeout: u64, write_timeout: u64, reuse: bool) -> Result<UdpSocket, Atom> {
         let addr = addr
             .parse::<SocketAddr>()
             .map_err(|_| atoms::bad_format())?;
 
         let domain = if addr.is_ipv4() {
-            Domain::ipv4()
+            Domain::IPV4
         } else {
-            Domain::ipv6()
+            Domain::IPV6
         };
 
-        let sock = Socket::new(domain, Type::dgram(), Some(Protocol::udp()))
+        let sock = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))
             .map_err(|_| atoms::socket_error())?;
 
-        sock.set_reuse_address(true)
-            .map_err(|_| atoms::socket_error())?;
+        if reuse {
 
-        sock.set_reuse_port(true)
-            .map_err(|_| atoms::socket_error())?;
+            sock.set_reuse_address(true)
+                .map_err(|_| atoms::socket_error())?;
+
+            sock.set_reuse_port(true)
+                .map_err(|_| atoms::socket_error())?;
+
+        }
 
         sock.set_read_timeout(Some(Duration::from_millis(read_timeout)))
             .map_err(|_| atoms::socket_error())?;
@@ -82,7 +86,7 @@ impl SocketCluster {
 
         sock.bind(&addr.into()).map_err(|_| atoms::socket_error())?;
 
-        let std_sock = sock.into_udp_socket();
+        let std_sock = sock.into();
 
         Ok(std_sock)
     }
@@ -129,11 +133,12 @@ impl SocketCluster {
         }
 
         let num_node = self.num_node;
+        let reuse_addr_port = num_node != 1;
 
         let mut sockets: Vec<Option<UdpSocket>> = Vec::with_capacity(num_node);
 
         for _n in 0..num_node {
-            let sock = Self::build_socket(addr, self.read_timeout, self.write_timeout)?;
+            let sock = Self::build_socket(addr, self.read_timeout, self.write_timeout, reuse_addr_port)?;
             sockets.push(Some(sock));
         }
 

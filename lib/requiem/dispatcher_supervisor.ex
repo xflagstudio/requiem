@@ -36,8 +36,7 @@ defmodule Requiem.DispatcherSupervisor do
          handler: Keyword.fetch!(opts, :handler),
          token_secret: Keyword.fetch!(opts, :token_secret),
          conn_id_secret: Keyword.fetch!(opts, :conn_id_secret),
-         number_of_sockets: Keyword.fetch!(opts, :number_of_sockets),
-         allow_address_routing: Keyword.fetch!(opts, :allow_address_routing)
+         number_of_sockets: Keyword.fetch!(opts, :number_of_sockets)
        ]}
     end)
     |> Enum.reduce([], fn x, acc -> [x | acc] end)

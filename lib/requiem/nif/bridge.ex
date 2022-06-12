@@ -125,9 +125,9 @@ defmodule Requiem.NIF.Bridge do
   @spec connection_is_closed(integer) :: boolean
   def connection_is_closed(_conn), do: error()
 
-  @spec connection_on_packet(pid, integer, binary) ::
+  @spec connection_on_packet(pid, integer, binary, term) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
-  def connection_on_packet(_pid, _conn, _packet), do: error()
+  def connection_on_packet(_pid, _conn, _packet, _peer), do: error()
 
   @spec connection_on_timeout(integer) ::
           {:ok, non_neg_integer} | {:error, :system_error | :already_closed}
