@@ -60,12 +60,12 @@ impl SocketCluster {
             .map_err(|_| atoms::bad_format())?;
 
         let domain = if addr.is_ipv4() {
-            Domain::ipv4()
+            Domain::IPV4
         } else {
-            Domain::ipv6()
+            Domain::IPV6
         };
 
-        let sock = Socket::new(domain, Type::dgram(), Some(Protocol::udp()))
+        let sock = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))
             .map_err(|_| atoms::socket_error())?;
 
         if reuse {
@@ -86,7 +86,7 @@ impl SocketCluster {
 
         sock.bind(&addr.into()).map_err(|_| atoms::socket_error())?;
 
-        let std_sock = sock.into_udp_socket();
+        let std_sock = sock.into();
 
         Ok(std_sock)
     }

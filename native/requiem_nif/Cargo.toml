@@ -17,7 +17,7 @@ strip = true
 
 [dependencies]
 rustler = "0.22"
-socket2 = { version= "0.2", features = ["reuseport"] }
+socket2 = { version= "0.4", features = ["all"] }
 num_cpus = "1.13"
 log = "0.4.16"
 simplelog = "0.10.0"
